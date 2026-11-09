@@ -4,10 +4,12 @@ A German reading and vocabulary workspace for learners from A1 to B2, built with
 
 ## Features currently implemented
 
+- Read original in-app German stories at A1, A2, B1 and B2 without pasting text.
+- Browse German Wikisource texts by genre (fairy tales, short stories, legends, novellas, novels and anecdotes), search titles, and load available transcriptions into the reader.
 - Browse and filter a directory of external German-reading publishers by CEFR level.
 - Open a distraction-free reading workspace.
 - Paste German text or import a plain-text `.txt` file.
-- Tap words in a passage to request translation and dictionary information.
+- Hover over or tap words in a passage to request English translation and German Wiktionary information; successful lookups are cached locally for faster repeat access.
 - Dictionary lookup integrations:
   - Wiktapi for structured Wiktionary-derived entries, definitions and available inflected forms.
   - German Language API for CEFR vocabulary, part of speech, gender and example sentences.
@@ -35,7 +37,7 @@ All API calls are made from the visitor's browser in this static build. If a pro
 
 ## Content and copyright
 
-The source directory links to original publishers. Fluentio Stories does not scrape or republish their stories. Free-to-read does not automatically mean free to republish. Use the reader with your own text, public-domain material, or text whose licence permits this use. Otherwise, read the material on the publisher's own website.
+The in-app starter stories are original texts written for Fluentio Stories. The larger text catalogue is retrieved from German Wikisource, which includes public-domain and Creative Commons works. Each text links back to its source page; check the individual work's licence and follow attribution/share-alike requirements before reuse. External reading sources remain linked to their original publishers.
 
 ## Current limitations / next engineering steps
 
@@ -43,6 +45,7 @@ The source directory links to original publishers. Fluentio Stories does not scr
 - Review scheduling is a lightweight interval system, not a validated SM-2 implementation.
 - German inflection and lemma detection depend on the dictionary provider's returned entry; not every inflected form will resolve.
 - Arbitrary websites cannot reliably be imported into the reader because of browser CORS, publisher restrictions and copyright. A browser extension or permitted source integrations would be needed.
+- The German Wikisource catalogue is a large community-maintained collection (about 58,000 works according to its portal); it is not a CEFR-graded catalogue, and text availability/quality varies by page.
 - Audio playback uses voices installed in the visitor's browser/device; voice quality and availability vary.
 - A stable production deployment should use a backend proxy/cache for API calls, observability, rate limiting and provider credentials where needed.
 
