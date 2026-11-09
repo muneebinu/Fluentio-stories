@@ -467,7 +467,7 @@ function App() {
           <h1>Find your level.<br/><em>Get lost</em> in a story.</h1>
           <p className="hero-description">Read real German stories from free graded-reading collections, then move on to complete public-domain novels and classic literature.</p>
           <button className="hero-button" onClick={()=>document.getElementById('library')?.scrollIntoView({behavior:'smooth'})}>Explore the library <ArrowUpRight size={17}/></button>
-          <div className="hero-meta"><span><BookOpen size={15}/> 430+ graded stories</span><span><Globe2 size={15}/> A1 · A2 · B1</span></div>
+          <div className="hero-meta"><span><BookOpen size={15}/> 430 graded stories</span><span><Globe2 size={15}/> A1 · A2 · B1</span></div>
         </div>
         <div className="hero-art" aria-label="Illustration of an open book"><div className="art-note note-top">LESEN · LERNEN · WACHSEN</div><div className="book-shadow"/><div className="book"><div className="book-label">DEUTSCH<br/>ENTDECKEN</div><div className="book-rule"/><div className="book-lines"><i/><i/><i/><i/></div><div className="book-mark">A1 / B1</div></div><div className="art-stamp">WORT<br/>FÜR WORT</div><div className="art-note note-bottom">YOUR NEXT CHAPTER STARTS HERE.</div></div>
       </section>
