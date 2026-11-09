@@ -50,57 +50,26 @@ function App() {
   const [readerFontSize, setReaderFontSize] = useState(17)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [bookCatalog, setBookCatalog] = useState([])
-  const [localBookCatalog, setLocalBookCatalog] = useState([])
-  const [localBookIds, setLocalBookIds] = useState([])
-  const [localBooksLoading, setLocalBooksLoading] = useState(true)
   const [bookCount, setBookCount] = useState(0)
   const [bookNext, setBookNext] = useState(null)
   const [bookSearch, setBookSearch] = useState('')
   const [booksLoading, setBooksLoading] = useState(false)
   const [booksError, setBooksError] = useState('')
   const [bookLoadingId, setBookLoadingId] = useState(null)
-  const [bookCategory, setBookCategory] = useState('Kategorie:Novelle')
+  const [bookCategory, setBookCategory] = useState('Kategorie:Roman')
   const [bookProvider, setBookProvider] = useState('wikisource')
   const [readerSource, setReaderSource] = useState('')
   const [lookupCache, setLookupCache] = useState(() => { try { return JSON.parse(localStorage.getItem('fluentio-lookup-cache') || '{}') } catch { return {} } })
   const lookupRequest = useRef(0)
 
-  async function loadBookCatalog(url = null, category = bookCategory, append = false, search = bookSearch, provider = bookProvider) {
+  async function loadBookCatalog(url = null, category = bookCategory, append = false, search = bookSearch) {
     setBooksLoading(true); setBooksError('')
     try {
-      if (provider === 'gutenberg') {
-        const offset = url && String(url).startsWith('local:') ? Number(String(url).slice(6)) || 0 : 0
-        const term = search.trim().toLocaleLowerCase()
-        let results = localBookCatalog
-        if (term) results = results.filter(book => (book.title || '').toLocaleLowerCase().includes(term) || (book.authors || []).some(author => (author.name || '').toLocaleLowerCase().includes(term)))
-        if (category !== 'all') {
-          results = results.filter(book => {
-            const text = [book.title, ...(book.subjects || [])].join(' ').toLocaleLowerCase()
-            if (category === 'a1-a2') return /Fabel|Anekdote|Märchen|Sage/.test(text)
-            if (category === 'b1') return /Erzählung|Novelle/.test(text)
-            if (category === 'b2') return /Roman|Kriminalroman/.test(text)
-            if (category === 'legends') return /Sage/.test(text)
-            if (category === 'fables') return /Fabel|Anekdote/.test(text)
-            if (category === 'long reads') return (book.word_count || 0) >= 10000
-            if (category === 'novels') return /novel|roman|fiction/.test(text)
-            if (category === 'short stories') return /short stor|short fiction|novelle|erzählung|tales/.test(text)
-            if (category === 'fairy tales') return /fairy|märchen|folklore/.test(text)
-            if (category === 'fiction') return /fiction|novel|roman|erzählung|novelle|tales/.test(text)
-            if (category === 'drama') return /drama|play|theater|theatre|tragödie|komödie/.test(text)
-            return true
-          })
-        }
-        setBookCatalog(results.slice(offset, offset + 32))
-        setBookCount(results.length)
-        setBookNext(offset + 32 < results.length ? 'local:' + (offset + 32) : null)
-        if (!results.length && !localBooksLoading) setBooksError('No locally hosted books match that search. Try another title or switch to German Wikisource.')
-        return
-      }
       let endpoint = url
-      if (!endpoint && provider === 'wikisource') {
+      if (!endpoint) {
         const params = new URLSearchParams({ action:'query', format:'json', origin:'*' })
         if (search.trim()) { params.set('list','search'); params.set('srsearch',search.trim()); params.set('srnamespace','0'); params.set('srlimit','50') }
-        else { params.set('list','categorymembers'); params.set('cmtitle',category==='all'?'Kategorie:Literatur':category); params.set('cmtype','page'); params.set('cmlimit','50') }
+        else { params.set('list','categorymembers'); params.set('cmtitle',category); params.set('cmtype','page'); params.set('cmlimit','100') }
         endpoint = 'https://de.wikisource.org/w/api.php?' + params.toString()
       }
       const response = await fetch(endpoint)
@@ -115,79 +84,46 @@ function App() {
         setBookNext('https://de.wikisource.org/w/api.php?' + params.toString())
       } else setBookNext(null)
     } catch {
-      setBooksError('The Wikisource catalogue is temporarily unavailable. Try the full-text shelf or search again.')
+      setBooksError('The German Wikisource catalogue is temporarily unavailable. Please try again.')
     } finally { setBooksLoading(false) }
   }
 
-  useEffect(() => { loadBookCatalog(null, 'Kategorie:Novelle', false, '', 'wikisource') }, [])
-
-  useEffect(() => {
-    fetch(import.meta.env.BASE_URL + 'books/index.json')
-      .then(response => { if (!response.ok) throw new Error('Local book index is not available'); return response.json() })
-      .then(data => {
-        const books = data.books || []
-        const ids = data.ids || books.map(book => book.id)
-        setLocalBookCatalog(books)
-        setLocalBookIds(ids)
-      })
-      .catch(() => { setLocalBookCatalog([]); setLocalBookIds([]) })
-      .finally(() => setLocalBooksLoading(false))
-  }, [])
-
-  useEffect(() => {
-    if (bookProvider === 'gutenberg' && !localBooksLoading) loadBookCatalog(null, bookCategory, false, bookSearch, 'gutenberg')
-  }, [bookProvider, localBookCatalog, localBooksLoading])
-
-  async function openGutenbergBook(book) {
-    const source = book.sourceUrl || ('https://www.gutenberg.org/ebooks/' + book.id)
-    if (!localBookIds.includes(book.id)) { setBooksError('This title is in the catalogue but its full text is not mirrored into Fluentio yet. Choose a title marked as hosted here or open the source page.'); return }
-    setBookLoadingId(book.id); setBooksError('')
-    try {
-      const textUrl = import.meta.env.BASE_URL + 'books/' + book.id + '.txt'
-      const response = await fetch(textUrl)
-      if (!response.ok) throw new Error('Locally hosted book text not found')
-      let text = await response.text()
-      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1)
-      const startMarker = text.indexOf('*** START OF THE PROJECT GUTENBERG EBOOK') >= 0 ? text.indexOf('*** START OF THE PROJECT GUTENBERG EBOOK') : text.indexOf('*** START OF THIS PROJECT GUTENBERG EBOOK')
-      if (startMarker >= 0) { const lineEnd = text.indexOf('\n', startMarker); if (lineEnd >= 0) text = text.slice(lineEnd + 1) }
-      const endMarker = text.indexOf('*** END OF THE PROJECT GUTENBERG EBOOK') >= 0 ? text.indexOf('*** END OF THE PROJECT GUTENBERG EBOOK') : text.indexOf('*** END OF THIS PROJECT GUTENBERG EBOOK')
-      if (endMarker >= 0) text = text.slice(0, endMarker)
-      text = text.split('\r').join('').trim()
-      if (text.length < 1200) throw new Error('The local edition is too short to be a complete book')
-      if (text.length > 1500000) text = text.slice(0,1500000) + '\n\n[The browser reader has shortened this very large text. Open the original source edition for the complete work.]'
-      openReader(text, book.title, source)
-    } catch { setBooksError('The locally hosted text could not be opened. Please try another full-text book.') }
-    finally { setBookLoadingId(null) }
-  }
+  useEffect(() => { loadBookCatalog(null, 'Kategorie:Roman', false, '') }, [])
 
   async function openWikisourcePage(page) {
+    const cacheKey = 'fluentio-wikisource-' + (page.pageid || page.title)
+    const source = 'https://de.wikisource.org/wiki/' + encodeURIComponent(page.title.replaceAll(' ','_'))
     setBookLoadingId(page.pageid || page.title); setBooksError('')
     try {
+      const cached = localStorage.getItem(cacheKey)
+      if (cached && cached.length >= 6000) { openReader(cached, page.title, source); return }
       const params = new URLSearchParams({ action:'query', prop:'extracts', explaintext:'1', exsectionformat:'plain', titles:page.title, format:'json', origin:'*' })
       const response = await fetch('https://de.wikisource.org/w/api.php?' + params.toString())
       if (!response.ok) throw new Error('Wikisource text unavailable')
       const data = await response.json()
       const article = Object.values(data.query?.pages || {})[0]
       let text = (article?.extract || '').trim()
-      if (text.length < 1200) {
+      if (text.length < 6000) {
         const parseParams = new URLSearchParams({ action:'parse', page:page.title, prop:'text', format:'json', origin:'*' })
         const parsed = await fetch('https://de.wikisource.org/w/api.php?' + parseParams.toString())
         if (parsed.ok) {
           const parsedData = await parsed.json()
           const html = parsedData.parse?.text || ''
           const doc = new DOMParser().parseFromString(html,'text/html')
-          doc.querySelectorAll('script,style,nav,header,footer,.mw-editsection,.references,.reflist,.navbox,.catlinks').forEach(node=>node.remove())
+          doc.querySelectorAll('script,style,nav,header,footer,.mw-editsection,.references,.reflist,.navbox,.catlinks,.toc').forEach(node=>node.remove())
           const expanded = (doc.querySelector('.mw-parser-output') || doc.body)?.innerText || ''
           if (expanded.trim().length > text.length) text = expanded.trim()
         }
       }
-      if (text.length < 1200) throw new Error('No substantial full-text transcription')
-      if (text.length > 1500000) text = text.slice(0,1500000) + '\\n\\n[The browser reader has shortened this very large text. Open the source edition for the complete work.]'
-      const source = 'https://de.wikisource.org/wiki/' + encodeURIComponent(page.title.replaceAll(' ','_'))
+      if (text.length < 6000) throw new Error('No substantial full-text transcription')
+      if (text.length > 1500000) text = text.slice(0,1500000) + '\n\n[The browser reader has shortened this very large text. Open the source edition for the complete work.]'
+      try { localStorage.setItem(cacheKey, text) } catch {}
       openReader(text, page.title, source)
-    } catch { setBooksError('This entry does not expose a complete readable transcription. We hide short fragments rather than pretending they are full books. Try another title or open the original source.') }
-    finally { setBookLoadingId(null) }
+    } catch {
+      setBooksError('This source page does not expose a substantial full-text transcription. Fluentio hides short fragments instead of presenting them as complete books. Try another title or open the original source.')
+    } finally { setBookLoadingId(null) }
   }
+
   function persistVocab(next) { setVocab(next); localStorage.setItem('fluentio-vocab', JSON.stringify(next)) }
   function saveCurrentText() {
     if (!readerText.trim()) { setError('Add a reading text before saving.'); return }
