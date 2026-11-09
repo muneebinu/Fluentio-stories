@@ -133,7 +133,7 @@ async function main() {
   writeFileSync(join(outputDir, 'NOTICE.txt'),
     'German-language full texts mirrored from German Wikisource for Fluentio Stories. ' +
     'Each entry links to its source page. Check the individual source page for the specific public-domain or Creative Commons licence and attribution requirements. ' +
-    'The reading-level labels are approximate genre-based challenges, not official CEFR grading.\\n'
+    'The reading-level labels are approximate genre-based challenges, not official CEFR grading.\n'
   )
   console.log('Hosted ' + books.length + ' complete German texts in the Fluentio library.')
   if (books.length < 5) throw new Error('Too few full texts were mirrored; refusing to publish an almost-empty library.')
