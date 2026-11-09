@@ -114,10 +114,10 @@ function App() {
       }
       if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1)
       const startMarker = text.indexOf('*** START OF THE PROJECT GUTENBERG EBOOK') >= 0 ? text.indexOf('*** START OF THE PROJECT GUTENBERG EBOOK') : text.indexOf('*** START OF THIS PROJECT GUTENBERG EBOOK')
-      if (startMarker >= 0) { const lineEnd = text.indexOf('\\n', startMarker); if (lineEnd >= 0) text = text.slice(lineEnd + 1) }
+      if (startMarker >= 0) { const lineEnd = text.indexOf('\n', startMarker); if (lineEnd >= 0) text = text.slice(lineEnd + 1) }
       const endMarker = text.indexOf('*** END OF THE PROJECT GUTENBERG EBOOK') >= 0 ? text.indexOf('*** END OF THE PROJECT GUTENBERG EBOOK') : text.indexOf('*** END OF THIS PROJECT GUTENBERG EBOOK')
       if (endMarker >= 0) text = text.slice(0, endMarker)
-      text = text.split('\\r').join('').trim()
+      text = text.split('\r').join('').trim()
       if (text.length < 1200) throw new Error('The retrieved text is too short to be a complete book')
       if (text.length > 1500000) text = text.slice(0,1500000) + '\\n\\n[The browser reader has shortened this very large text. Open the source edition for the complete work.]'
       openReader(text, book.title, source)
