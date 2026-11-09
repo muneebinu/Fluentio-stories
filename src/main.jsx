@@ -179,7 +179,7 @@ function App() {
       if (text.length > 1500000) {
         text = text.slice(0, 1500000) + '\\n\\n[Reader limit reached. The source edition contains additional text.]'
       }
-      text = text.replace(/\\n[ \\t]+/g, '\\n').replace(/\\n{3,}/g, '\\n\\n').trim()
+      text = text.replace(/\\n[ \\t]+/g, '\n').replace(/\n{3,}/g, '\\n\\n').trim()
       try { localStorage.setItem(cacheKey, text) } catch {}
       openReader(text, title, source)
     } catch (error) {
@@ -199,11 +199,11 @@ function App() {
       const response = await fetch(url, { signal: AbortSignal.timeout(30000) })
       if (!response.ok) throw new Error('Project Gutenberg returned HTTP ' + response.status)
       let text = await response.text()
-      const start = text.match(/\\*\\*\\* START OF (?:THE|THIS) PROJECT GUTENBERG EBOOK[^\\n]*\\n/i)
+      const start = text.match(/\*\*\* START OF (?:THE|THIS) PROJECT GUTENBERG EBOOK[^\n]*\n/i)
       if (start) text = text.slice(start.index + start[0].length)
-      const end = text.search(/\\*\\*\\* END OF (?:THE|THIS) PROJECT GUTENBERG EBOOK/i)
+      const end = text.search(/\*\*\* END OF (?:THE|THIS) PROJECT GUTENBERG EBOOK/i)
       if (end >= 0) text = text.slice(0, end)
-      text = text.replace(/\\r/g, '').replace(/[ \\t]+\\n/g, '\\n').replace(/\\n{3,}/g, '\\n\\n').trim()
+      text = text.replace(/\r/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\\n\\n').trim()
       if (text.length < 1000) throw new Error('The full-text file did not contain enough readable text')
       openReader(text, book.title, book.source)
     } catch (error) {
@@ -257,7 +257,7 @@ function App() {
   }
   function exportVocab() {
     const rows = [['German','English','Lemma','Part of speech','Gender'], ...vocab.map(v => [v.word,v.meaning,v.lemma,v.pos,v.gender])]
-    const csv = rows.map(row => row.map(value => '"'+String(value || '').replaceAll('"','""')+'"').join(',')).join('\\n')
+    const csv = rows.map(row => row.map(value => '"'+String(value || '').replaceAll('"','""')+'"').join(',')).join('\n')
     const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}))
     const a = document.createElement('a'); a.href = url; a.download = 'fluentio-vocabulary.csv'; a.click(); URL.revokeObjectURL(url)
   }
