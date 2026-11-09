@@ -147,3 +147,5 @@
 .featured-reader-actions a{font:9px 'DM Mono',monospace;color:#874F41;text-decoration:underline;text-underline-offset:3px}
 @media(max-width:900px){.featured-reader-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){.featured-reader-shelf{padding:17px;margin:24px -4px 32px}.featured-reader-heading{align-items:flex-start;flex-direction:column}.featured-reader-grid{grid-template-columns:1fr}.featured-reader-card{min-height:0}}
+
+.catalog-source-only{font:9px 'DM Mono',monospace;color:#874F41}
