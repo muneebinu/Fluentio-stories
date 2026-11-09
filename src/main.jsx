@@ -19,13 +19,7 @@ const sources = [
   { id: 7, title: 'deutsch.info', description: 'A multilingual learning platform with courses, grammar and an authentic German media library.', levelLabel: 'A1–B2', levels: ['A1','A2','B1','B2'], type: 'Courses & media', language: 'German', url: 'https://deutsch.info/', tag: 'Multilingual support', note: 'The platform offers free learning materials and authentic reading resources.' },
   { id: 8, title: 'Sprachprep', description: 'A growing collection of German reading passages and comprehension exercises.', levelLabel: 'A1–B2', levels: ['A1','A2','B1','B2'], type: 'Reading practice', language: 'German', url: 'https://sprachprep.com/reading', tag: 'Practice passages', note: 'Browse passages on the publisher site; check individual content terms.' },
   { id: 9, title: 'Morgenlese', description: 'Short daily German stories presented at four learner levels.', levelLabel: 'A1–B2', levels: ['A1','A2','B1','B2'], type: 'Daily stories', language: 'German', url: 'https://morgenlese.bytesicht.com/', tag: 'Daily reading', note: 'An independent reading platform. Use its own reader and terms.' },
-  { id: 10, title: 'German literature · Gutenberg', description: 'A large collection of German-language books and literary works. Difficulty varies.', levelLabel: 'B2+', levels: ['B2'], type: 'Classic literature', language: 'German', url: 'https://www.gutenberg.org/browse/languages/de', tag: 'Original literature', note: 'Check copyright status of each individual work before reuse.' },
-]
 
-const featuredReads = [
-  { title: 'Meine Stadt', level: 'A1', topic: 'Everyday life · Places', url: 'https://german.net/reading/meine-stadt/' },
-  { title: 'Unser Haus', level: 'A1', topic: 'Home · Family', url: 'https://german.net/reading/unser-haus/' },
-  { title: 'In der Schule', level: 'A2', topic: 'Education · Daily routines', url: 'https://german.net/reading/schule/' },
 ]
 
 const starterText = 'Fügen Sie hier einen deutschen Text ein, den Sie lesen möchten. Wählen Sie anschließend ein Wort aus, um seine Bedeutung nachzuschlagen.'
