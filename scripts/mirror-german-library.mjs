@@ -91,7 +91,7 @@ async function mirrorWikisource() {
         const sourceUrl = 'https://de.wikisource.org/wiki/' + encodeURIComponent(title.replaceAll(' ', '_'))
         const authorMatch = text.match(/(?:Autor|Verfasser)[:：]\s*([^\n]+)/i)
         const authors = [{ name: authorMatch?.[1]?.trim() || 'Wikisource edition' }]
-        const wordCount = text.split(/\\s+/).filter(Boolean).length
+        const wordCount = text.split(/\s+/).filter(Boolean).length
         found.set(page.pageid, {
           id, title, authors, subjects: [category.replace('Kategorie:', '')],
           provider: 'wikisource', sourceUrl, word_count: wordCount
