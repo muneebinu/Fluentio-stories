@@ -19,12 +19,12 @@ const germanAuthorHints = [
 
 async function collectBooks() {
   const books = []
-  const curatedResponse = await fetch('https://gutendex.com/books/?ids=' + curatedIds.join(','))
+  const curatedResponse = await fetch('https://gutendex.com/books/?ids=' + curatedIds.join(','), { headers: { 'User-Agent': 'FluentioStories/1.0 (German reading project)', 'Accept': 'application/json' } })
   if (curatedResponse.ok) { const curatedData = await curatedResponse.json(); for (const book of curatedData.results || []) books.push(book) }
   let next = 'https://gutendex.com/books/?languages=de&mime_type=text%2Fplain&copyright=false&author_year_end=1955'
   let pages = 0
   while (next && pages < 40 && books.length < 160) {
-    const response = await fetch(next)
+    const response = await fetch(next, { headers: { 'User-Agent': 'FluentioStories/1.0 (German reading project)', 'Accept': 'application/json' } })
     if (!response.ok) throw new Error('Gutendex catalogue request failed: ' + response.status)
     const data = await response.json()
     for (const book of data.results || []) {
