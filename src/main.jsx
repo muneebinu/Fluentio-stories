@@ -134,7 +134,7 @@ function App() {
         <input className="reader-title-input" value={readerTitle} onChange={e=>setReaderTitle(e.target.value)} placeholder="Give your reading a title..." aria-label="Reading title"/>
         <p className="reader-instructions">Paste text from a source you are permitted to use, then tap any German word to explore it.</p>
         <textarea className="reader-paste" value={readerText} onChange={e=>setReaderText(e.target.value)} placeholder="Paste your German text here…" aria-label="German reading text"/>
-        <div className="reader-toolbar"><span>{readerText.trim() ? readerText.trim().split(/\s+/).length + ' words' : 'Your text stays in this browser session.'}</span><button onClick={()=>{setReaderText('');setReaderTitle('');setActiveWord('')}}>Clear text</button></div>
+        <div className="reader-toolbar"><span>{readerText.trim() ? readerText.trim().split(/\s+/).length + ' words' : 'Your text stays in this browser session.'}</span><div className="reader-toolbar-actions"><label className="upload-text-button">Upload .txt<input type="file" accept=".txt,text/plain" onChange={e=>loadTextFile(e.target.files?.[0])}/></label><button onClick={()=>{setReaderText('');setReaderTitle('');setActiveWord('')}}>Clear text</button></div></div>
         <div className="reader-divider"/>
         <div className="reading-heading"><span className="eyebrow">INTERACTIVE READING</span><span className="reading-hint"><span className="hint-dot"/> Tap a word to look it up</span></div>
         {readerText.trim()
