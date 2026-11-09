@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Fluentio Stories Web Reader",
+  "version": "1.0.0",
+  "description": "Select German words or phrases on any webpage to translate and save them for practice.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://api.mymemory.translated.net/*",
+    "https://api.wiktapi.dev/*",
+    "https://german-language.onrender.com/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Fluentio Stories vocabulary"
+  }
+}
