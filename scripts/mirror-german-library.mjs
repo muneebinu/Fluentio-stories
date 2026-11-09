@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const root = process.cwd()
@@ -117,13 +117,23 @@ async function mirrorWikisource() {
 
 async function main() {
   mkdirSync(outputDir, { recursive: true })
+  const indexPath = join(outputDir, 'index.json')
+  if (existsSync(indexPath)) {
+    try {
+      const cached = JSON.parse(readFileSync(indexPath, 'utf8'))
+      if ((cached.books || []).length >= 5) {
+        console.log('Using cached local library: ' + cached.books.length + ' complete German texts.')
+        return
+      }
+    } catch {}
+  }
   const books = await mirrorWikisource()
   const ids = books.map(book => book.id)
-  writeFileSync(join(outputDir, 'index.json'), JSON.stringify({ ids, count: books.length, books }, null, 2))
+  writeFileSync(indexPath, JSON.stringify({ ids, count: books.length, books }, null, 2))
   writeFileSync(join(outputDir, 'NOTICE.txt'),
     'German-language full texts mirrored from German Wikisource for Fluentio Stories. ' +
     'Each entry links to its source page. Check the individual source page for the specific public-domain or Creative Commons licence and attribution requirements. ' +
-    'The reading-level labels are approximate genre-based challenges, not official CEFR grading.\n'
+    'The reading-level labels are approximate genre-based challenges, not official CEFR grading.\\n'
   )
   console.log('Hosted ' + books.length + ' complete German texts in the Fluentio library.')
   if (books.length < 5) throw new Error('Too few full texts were mirrored; refusing to publish an almost-empty library.')
