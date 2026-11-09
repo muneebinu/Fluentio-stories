@@ -60,8 +60,9 @@ function App() {
   const [readerFontSize, setReaderFontSize] = useState(17)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [bookCatalog, setBookCatalog] = useState([])
-  const [featuredBooks, setFeaturedBooks] = useState([])
-  const [featuredBooksLoading, setFeaturedBooksLoading] = useState(true)
+  const [localBookCatalog, setLocalBookCatalog] = useState([])
+  const [localBookIds, setLocalBookIds] = useState([])
+  const [localBooksLoading, setLocalBooksLoading] = useState(true)
   const [bookCount, setBookCount] = useState(0)
   const [bookNext, setBookNext] = useState(null)
   const [bookSearch, setBookSearch] = useState('')
@@ -77,13 +78,29 @@ function App() {
   async function loadBookCatalog(url = null, category = bookCategory, append = false, search = bookSearch, provider = bookProvider) {
     setBooksLoading(true); setBooksError('')
     try {
-      let endpoint = url
-      if (!endpoint && provider === 'gutenberg') {
-        const params = new URLSearchParams({ languages:'de', mime_type:'text/plain', copyright:'false', author_year_end:'1955' })
-        if (search.trim()) params.set('search', search.trim())
-        if (category !== 'all') params.set('topic', category)
-        endpoint = 'https://gutendex.com/books/?' + params.toString()
+      if (provider === 'gutenberg') {
+        const offset = url && String(url).startsWith('local:') ? Number(String(url).slice(6)) || 0 : 0
+        const term = search.trim().toLocaleLowerCase()
+        let results = localBookCatalog
+        if (term) results = results.filter(book => (book.title || '').toLocaleLowerCase().includes(term) || (book.authors || []).some(author => (author.name || '').toLocaleLowerCase().includes(term)))
+        if (category !== 'all') {
+          results = results.filter(book => {
+            const text = [book.title, ...(book.subjects || [])].join(' ').toLocaleLowerCase()
+            if (category === 'novels') return /novel|roman|fiction/.test(text)
+            if (category === 'short stories') return /short stor|short fiction|novelle|erzählung|tales/.test(text)
+            if (category === 'fairy tales') return /fairy|märchen|folklore/.test(text)
+            if (category === 'fiction') return /fiction|novel|roman|erzählung|novelle|tales/.test(text)
+            if (category === 'drama') return /drama|play|theater|theatre|tragödie|komödie/.test(text)
+            return true
+          })
+        }
+        setBookCatalog(results.slice(offset, offset + 32))
+        setBookCount(results.length)
+        setBookNext(offset + 32 < results.length ? 'local:' + (offset + 32) : null)
+        if (!results.length && !localBooksLoading) setBooksError('No locally hosted books match that search. Try another title or switch to German Wikisource.')
+        return
       }
+      let endpoint = url
       if (!endpoint && provider === 'wikisource') {
         const params = new URLSearchParams({ action:'query', format:'json', origin:'*' })
         if (search.trim()) { params.set('list','search'); params.set('srsearch',search.trim()); params.set('srnamespace','0'); params.set('srlimit','50') }
@@ -91,57 +108,56 @@ function App() {
         endpoint = 'https://de.wikisource.org/w/api.php?' + params.toString()
       }
       const response = await fetch(endpoint)
-      if (!response.ok) throw new Error('Book catalogue returned ' + response.status)
+      if (!response.ok) throw new Error('Wikisource catalogue returned ' + response.status)
       const data = await response.json()
-      const results = provider === 'gutenberg' ? (data.results || []) : (search.trim() ? (data.query?.search || []) : (data.query?.categorymembers || []))
+      const results = search.trim() ? (data.query?.search || []) : (data.query?.categorymembers || [])
       setBookCatalog(current => append ? [...current, ...results] : results)
-      setBookCount(data.count || data.query?.searchinfo?.totalhits || (provider==='wikisource'?results.length:0))
-      if (provider === 'gutenberg') setBookNext(data.next || null)
-      else if (data.continue) {
+      setBookCount(data.query?.searchinfo?.totalhits || results.length)
+      if (data.continue) {
         const params = new URLSearchParams(endpoint.split('?')[1] || '')
         Object.entries(data.continue).forEach(([key,value])=>params.set(key,String(value)))
         setBookNext('https://de.wikisource.org/w/api.php?' + params.toString())
       } else setBookNext(null)
     } catch {
-      setBooksError(provider==='gutenberg' ? 'The full-book catalogue is temporarily unavailable. Try the Wikisource collection or search again.' : 'The Wikisource catalogue is temporarily unavailable. Try the full-book collection or search again.')
+      setBooksError('The Wikisource catalogue is temporarily unavailable. Try the full-text shelf or search again.')
     } finally { setBooksLoading(false) }
   }
 
-  useEffect(() => { loadBookCatalog(null, 'all', false, '', 'gutenberg') }, [])
-
   useEffect(() => {
-    fetch('https://gutendex.com/books/?ids=' + featuredReaderMeta.map(book=>book.id).join(','))
-      .then(response=>{if(!response.ok) throw new Error('Could not load featured readers'); return response.json()})
-      .then(data=>setFeaturedBooks(data.results || []))
-      .catch(()=>setFeaturedBooks([]))
-      .finally(()=>setFeaturedBooksLoading(false))
+    fetch(import.meta.env.BASE_URL + 'books/index.json')
+      .then(response => { if (!response.ok) throw new Error('Local book index is not available'); return response.json() })
+      .then(data => {
+        const books = data.books || []
+        const ids = data.ids || books.map(book => book.id)
+        setLocalBookCatalog(books)
+        setLocalBookIds(ids)
+        setBookCatalog(books.slice(0,32))
+        setBookCount(books.length)
+        setBookNext(books.length > 32 ? 'local:32' : null)
+      })
+      .catch(() => setBooksError('The local book shelf has not been generated yet. The deployment build must mirror the licensed full-text collection first.'))
+      .finally(() => setLocalBooksLoading(false))
   }, [])
 
   async function openGutenbergBook(book) {
-    const formats = book.formats || {}
-    const textUrl = formats['text/plain; charset=utf-8'] || formats['text/plain; charset=us-ascii'] || formats['text/plain'] || Object.entries(formats).find(([type])=>type.startsWith('text/plain'))?.[1] || formats['text/html; charset=utf-8'] || Object.entries(formats).find(([type])=>type.startsWith('text/html'))?.[1]
     const source = 'https://www.gutenberg.org/ebooks/' + book.id
-    if (!textUrl) { setBooksError('This book has no plain-text or HTML edition. Open its original source page instead.'); return }
+    if (!localBookIds.includes(book.id)) { setBooksError('This title is in the catalogue but its full text is not mirrored into Fluentio yet. Choose a title marked as hosted here or open the source page.'); return }
     setBookLoadingId(book.id); setBooksError('')
     try {
+      const textUrl = import.meta.env.BASE_URL + 'books/' + book.id + '.txt'
       const response = await fetch(textUrl)
-      if (!response.ok) throw new Error('Book text request failed')
+      if (!response.ok) throw new Error('Locally hosted book text not found')
       let text = await response.text()
-      if ((response.headers.get('content-type') || '').toLowerCase().includes('text/html') || textUrl.toLowerCase().includes('.html')) {
-        const doc = new DOMParser().parseFromString(text,'text/html')
-        doc.querySelectorAll('script,style,nav,header,footer,.pg-boilerplate').forEach(node=>node.remove())
-        text = doc.body?.innerText || doc.body?.textContent || ''
-      }
       if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1)
       const startMarker = text.indexOf('*** START OF THE PROJECT GUTENBERG EBOOK') >= 0 ? text.indexOf('*** START OF THE PROJECT GUTENBERG EBOOK') : text.indexOf('*** START OF THIS PROJECT GUTENBERG EBOOK')
-      if (startMarker >= 0) { const lineEnd = text.indexOf('\n', startMarker); if (lineEnd >= 0) text = text.slice(lineEnd + 1) }
+      if (startMarker >= 0) { const lineEnd = text.indexOf('\\n', startMarker); if (lineEnd >= 0) text = text.slice(lineEnd + 1) }
       const endMarker = text.indexOf('*** END OF THE PROJECT GUTENBERG EBOOK') >= 0 ? text.indexOf('*** END OF THE PROJECT GUTENBERG EBOOK') : text.indexOf('*** END OF THIS PROJECT GUTENBERG EBOOK')
       if (endMarker >= 0) text = text.slice(0, endMarker)
-      text = text.split('\r').join('').trim()
-      if (text.length < 1200) throw new Error('The retrieved text is too short to be a complete book')
-      if (text.length > 1500000) text = text.slice(0,1500000) + '\\n\\n[The browser reader has shortened this very large text. Open the source edition for the complete work.]'
+      text = text.split('\\r').join('').trim()
+      if (text.length < 1200) throw new Error('The local edition is too short to be a complete book')
+      if (text.length > 1500000) text = text.slice(0,1500000) + '\\n\\n[The browser reader has shortened this very large text. Open the original source edition for the complete work.]'
       openReader(text, book.title, source)
-    } catch { setBooksError('This book could not be loaded inside the reader. The original source link is available on its card; try another full-text edition.') }
+    } catch { setBooksError('The locally hosted text could not be opened. Please try another full-text book.') }
     finally { setBookLoadingId(null) }
   }
 
