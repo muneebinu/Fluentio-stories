@@ -103,3 +103,9 @@
 .reader-import .reader-title-input{margin-top:0}
 @media(max-width:900px){.story-grid,.book-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){.in-app-library{padding:18px;margin:30px -4px}.in-app-library-heading,.catalog-heading{align-items:flex-start;flex-direction:column}.library-count{white-space:normal}.story-grid,.book-grid{grid-template-columns:1fr}.catalog-search{width:100%;min-width:0}.catalog-meta{flex-direction:column;gap:5px}.story-card{padding:16px}.catalog-book{padding:16px}}
+
+.catalog-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0 16px}
+.catalog-controls select{max-width:100%;border:1px solid rgba(36,72,85,.25);background:#fffaf2;color:#244855;padding:10px 12px;font:10px 'DM Mono',monospace}
+.catalog-controls span{font:9px 'DM Mono',monospace;color:#874F41}
+.reader-source-link{display:inline-flex;align-items:center;gap:5px;font:9px 'DM Mono',monospace;color:#E64833;margin-left:8px;vertical-align:middle}
+@media(max-width:650px){.catalog-controls{align-items:stretch;flex-direction:column}.catalog-controls select{width:100%}}
