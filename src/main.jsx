@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client'
 import { ArrowLeft, ArrowUpRight, BookOpen, Bookmark, Check, ChevronDown, ExternalLink, Globe2, Search, Sparkles, X, Languages, Volume2, Download, Trash2, RotateCcw, GraduationCap } from 'lucide-react'
 import './styles.css'
 import './reader.css'
-import { originalStories } from './stories'
 
 const levels = ['All levels', 'A1', 'A2', 'B1', 'B2']
 
@@ -57,40 +56,72 @@ function App() {
   const [booksLoading, setBooksLoading] = useState(false)
   const [booksError, setBooksError] = useState('')
   const [bookLoadingId, setBookLoadingId] = useState(null)
-  const [bookCategory, setBookCategory] = useState('Kategorie:Märchen')
+  const [bookCategory, setBookCategory] = useState('all')
+  const [bookProvider, setBookProvider] = useState('gutenberg')
   const [readerSource, setReaderSource] = useState('')
   const [lookupCache, setLookupCache] = useState(() => { try { return JSON.parse(localStorage.getItem('fluentio-lookup-cache') || '{}') } catch { return {} } })
   const lookupRequest = useRef(0)
 
-  async function loadBookCatalog(url = null, category = bookCategory, append = false, search = bookSearch) {
+  async function loadBookCatalog(url = null, category = bookCategory, append = false, search = bookSearch, provider = bookProvider) {
     setBooksLoading(true); setBooksError('')
     try {
       let endpoint = url
-      if (!endpoint) {
-        const params = new URLSearchParams({ action: 'query', format: 'json', origin: '*' })
-        if (search.trim()) {
-          params.set('list','search'); params.set('srsearch',search.trim()); params.set('srnamespace','0'); params.set('srlimit','50')
-        } else {
-          params.set('list','categorymembers'); params.set('cmtitle',category); params.set('cmtype','page'); params.set('cmlimit','50')
-        }
+      if (!endpoint && provider === 'gutenberg') {
+        const params = new URLSearchParams({ languages:'de', mime_type:'text/plain', copyright:'false', author_year_end:'1955' })
+        if (search.trim()) params.set('search', search.trim())
+        if (category !== 'all') params.set('topic', category)
+        endpoint = 'https://gutendex.com/books/?' + params.toString()
+      }
+      if (!endpoint && provider === 'wikisource') {
+        const params = new URLSearchParams({ action:'query', format:'json', origin:'*' })
+        if (search.trim()) { params.set('list','search'); params.set('srsearch',search.trim()); params.set('srnamespace','0'); params.set('srlimit','50') }
+        else { params.set('list','categorymembers'); params.set('cmtitle',category==='all'?'Kategorie:Literatur':category); params.set('cmtype','page'); params.set('cmlimit','50') }
         endpoint = 'https://de.wikisource.org/w/api.php?' + params.toString()
       }
       const response = await fetch(endpoint)
-      if (!response.ok) throw new Error('Wikisource catalogue returned ' + response.status)
+      if (!response.ok) throw new Error('Book catalogue returned ' + response.status)
       const data = await response.json()
-      const results = search.trim() ? (data.query?.search || []) : (data.query?.categorymembers || [])
+      const results = provider === 'gutenberg' ? (data.results || []) : (search.trim() ? (data.query?.search || []) : (data.query?.categorymembers || []))
       setBookCatalog(current => append ? [...current, ...results] : results)
-      setBookCount(search.trim() ? (data.query?.searchinfo?.totalhits || results.length) : 58246)
-      if (data.continue) {
+      setBookCount(data.count || data.query?.searchinfo?.totalhits || (provider==='wikisource'?results.length:0))
+      if (provider === 'gutenberg') setBookNext(data.next || null)
+      else if (data.continue) {
         const params = new URLSearchParams(endpoint.split('?')[1] || '')
         Object.entries(data.continue).forEach(([key,value])=>params.set(key,String(value)))
         setBookNext('https://de.wikisource.org/w/api.php?' + params.toString())
       } else setBookNext(null)
-    } catch { setBooksError('The Wikisource catalogue is temporarily unavailable. Your built-in stories are still ready to read.') }
-    finally { setBooksLoading(false) }
+    } catch {
+      setBooksError(provider==='gutenberg' ? 'The full-book catalogue is temporarily unavailable. Try the Wikisource collection or search again.' : 'The Wikisource catalogue is temporarily unavailable. Try the full-book collection or search again.')
+    } finally { setBooksLoading(false) }
   }
 
-  useEffect(() => { loadBookCatalog(null, 'Kategorie:Märchen', false, '') }, [])
+  useEffect(() => { loadBookCatalog(null, 'all', false, '', 'gutenberg') }, [])
+
+  async function openGutenbergBook(book) {
+    const formats = book.formats || {}
+    const textUrl = formats['text/plain; charset=utf-8'] || formats['text/plain; charset=us-ascii'] || formats['text/plain'] || Object.entries(formats).find(([type])=>type.startsWith('text/plain'))?.[1] || formats['text/html; charset=utf-8'] || Object.entries(formats).find(([type])=>type.startsWith('text/html'))?.[1]
+    const source = 'https://www.gutenberg.org/ebooks/' + book.id
+    if (!textUrl) { setBooksError('This book has no plain-text or HTML edition. Open its original source page instead.'); return }
+    setBookLoadingId(book.id); setBooksError('')
+    try {
+      const response = await fetch(textUrl)
+      if (!response.ok) throw new Error('Book text request failed')
+      let text = await response.text()
+      if (/text\\/html/i.test(response.headers.get('content-type') || '') || /\\.html?($|\\?)/i.test(textUrl)) {
+        const doc = new DOMParser().parseFromString(text,'text/html')
+        doc.querySelectorAll('script,style,nav,header,footer,.pg-boilerplate').forEach(node=>node.remove())
+        text = doc.body?.innerText || doc.body?.textContent || ''
+      }
+      text = text.replace(/^\\uFEFF/,'')
+      text = text.replace(/^[\\s\\S]*?\\*\\*\\* START OF (?:THE|THIS) PROJECT GUTENBERG EBOOK[^\\n]*\\n/i,'')
+      text = text.replace(/\\n\\*\\*\\* END OF (?:THE|THIS) PROJECT GUTENBERG EBOOK[\\s\\S]*$/i,'')
+      text = text.replace(/\\r/g,'').replace(/\\n{4,}/g,'\\n\\n').trim()
+      if (text.length < 1200) throw new Error('The retrieved text is too short to be a complete book')
+      if (text.length > 1500000) text = text.slice(0,1500000) + '\\n\\n[The browser reader has shortened this very large text. Open the source edition for the complete work.]'
+      openReader(text, book.title, source)
+    } catch { setBooksError('This book could not be loaded inside the reader. The original source link is available on its card; try another full-text edition.') }
+    finally { setBookLoadingId(null) }
+  }
 
   async function openWikisourcePage(page) {
     setBookLoadingId(page.pageid || page.title); setBooksError('')
@@ -101,11 +132,23 @@ function App() {
       const data = await response.json()
       const article = Object.values(data.query?.pages || {})[0]
       let text = (article?.extract || '').trim()
-      if (!text) throw new Error('No readable transcription')
-      if (text.length > 850000) text = text.slice(0,850000) + '\n\n[Text shortened for browser performance.]'
+      if (text.length < 1200) {
+        const parseParams = new URLSearchParams({ action:'parse', page:page.title, prop:'text', format:'json', origin:'*' })
+        const parsed = await fetch('https://de.wikisource.org/w/api.php?' + parseParams.toString())
+        if (parsed.ok) {
+          const parsedData = await parsed.json()
+          const html = parsedData.parse?.text || ''
+          const doc = new DOMParser().parseFromString(html,'text/html')
+          doc.querySelectorAll('script,style,nav,header,footer,.mw-editsection,.references,.reflist,.navbox,.catlinks').forEach(node=>node.remove())
+          const expanded = (doc.querySelector('.mw-parser-output') || doc.body)?.innerText || ''
+          if (expanded.trim().length > text.length) text = expanded.trim()
+        }
+      }
+      if (text.length < 1200) throw new Error('No substantial full-text transcription')
+      if (text.length > 1500000) text = text.slice(0,1500000) + '\\n\\n[The browser reader has shortened this very large text. Open the source edition for the complete work.]'
       const source = 'https://de.wikisource.org/wiki/' + encodeURIComponent(page.title.replaceAll(' ','_'))
       openReader(text, page.title, source)
-    } catch { setBooksError('This entry has no readable transcription available through the public API. Try another text or open its Wikisource page.') }
+    } catch { setBooksError('This entry does not expose a complete readable transcription. We hide short fragments rather than pretending they are full books. Try another title or open the original source.') }
     finally { setBookLoadingId(null) }
   }
   function persistVocab(next) { setVocab(next); localStorage.setItem('fluentio-vocab', JSON.stringify(next)) }
@@ -367,15 +410,15 @@ function App() {
         <div className="section-heading"><div><div className="eyebrow">THE READING ROOM</div><h2>Find your next read.</h2><p>Browse stories and books you can read right here, plus trusted external learning sources.</p></div><div className="search-wrap"><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search reading sources..." aria-label="Search reading sources"/></div></div>
         <div className="filters">{levels.map(l=><button key={l} className={level===l?'selected':''} onClick={()=>setLevel(l)}>{l}</button>)}<span className="result-count">{filtered.length} SOURCES</span></div>
         <section className="in-app-library">
-          <div className="in-app-library-heading"><div><span className="eyebrow">READ WITHOUT LEAVING FLUENTIO</span><h3>Stories ready to open.</h3><p>Original short stories for A1, A2, B1 and B2. Tap any story and start reading immediately.</p></div><span className="library-count">{originalStories.length} ORIGINAL STORIES</span></div>
-          <div className="story-grid">{originalStories.filter(story=>level==='All levels'||story.level===level).map(story=><article className="story-card" key={story.id}><span className="story-level">{story.level} · {story.topic}</span><h4>{story.title}</h4><p>{story.description}</p><button onClick={()=>openReader(story.text,story.title)}>Read story <ArrowUpRight size={15}/></button></article>)}</div>
-          {originalStories.filter(story=>level==='All levels'||story.level===level).length===0&&<p className="panel-muted">No original story at this level yet.</p>}
-          <div className="catalog-heading"><div><span className="eyebrow">THE CLASSICS COLLECTION</span><h3>German books, stories &amp; legends.</h3><p>Explore the 58,000+ work German Wikisource collection. Browse genres or search titles and authors; open available texts in the Fluentio reader.</p></div><div className="catalog-search"><input value={bookSearch} onChange={e=>setBookSearch(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')loadBookCatalog(null,bookCategory,false)}} placeholder="Search titles and authors..."/><button onClick={()=>loadBookCatalog(null,bookCategory,false)}><Search size={15}/></button></div></div>
-          <div className="catalog-controls"><select value={bookCategory} onChange={e=>{setBookCategory(e.target.value);setBookSearch('');loadBookCatalog(null,e.target.value,false,'')}}><option value="Kategorie:Märchen">Fairy tales (Märchen)</option><option value="Kategorie:Erzählung">Short stories (Erzählungen)</option><option value="Kategorie:Sage">Legends (Sagen)</option><option value="Kategorie:Novelle">Novellas (Novellen)</option><option value="Kategorie:Roman">Novels (Romane)</option><option value="Kategorie:Anekdote">Anecdotes (Anekdoten)</option></select><span>{bookSearch.trim()?bookCount.toLocaleString()+' search results':'58,000+ works indexed on German Wikisource'}</span></div>
-          {booksError&&<p className="reader-feedback">{booksError}</p>}
-          {booksLoading&&!bookCatalog.length?<p className="panel-muted">Loading German texts…</p>:<div className="book-grid">{bookCatalog.map(book=><article className="catalog-book" key={book.pageid||book.title}><span className="book-level">GERMAN WIKISOURCE · TEXT</span><h4>{book.title}</h4><p>{book.snippet?book.snippet.replace(/<[^>]*>/g,'').slice(0,130):'A German-language literary work from the Wikisource collection.'}</p><small>Original source transcription</small><button disabled={bookLoadingId===(book.pageid||book.title)} onClick={()=>openWikisourcePage(book)}>{bookLoadingId===(book.pageid||book.title)?'Opening…':'Read inside Fluentio'} <ArrowUpRight size={14}/></button></article>)}</div>}
-          {bookNext&&<button className="catalog-more" disabled={booksLoading} onClick={()=>loadBookCatalog(bookNext,bookCategory,true)}>{booksLoading?'Loading…':'Load more texts'}</button>}
-          <p className="catalog-note">Texts are retrieved from German Wikisource. The collection includes public-domain and Creative Commons works; check each source page for its specific licence and attribution requirements.</p></section>
+                    <div className="in-app-library-heading"><div><span className="eyebrow">FLUENTIO LONG-FORM LIBRARY</span><h3>Complete German books. Read them here.</h3><p>Search full-length German novels, novellas, fairy tales and short stories. Open the available text directly in the Fluentio reader and look up words as you go.</p></div><span className="library-count">{bookCount ? bookCount.toLocaleString() + " MATCHING BOOKS" : "LIVE BOOK CATALOGUE"}</span></div>
+                    <div className="library-provider-tabs"><button className={bookProvider==='gutenberg'?'active':''} onClick={()=>{setBookProvider('gutenberg');setBookCategory('all');setBookSearch('');loadBookCatalog(null,'all',false,'','gutenberg')}}>Full books · Project Gutenberg</button><button className={bookProvider==='wikisource'?'active':''} onClick={()=>{setBookProvider('wikisource');setBookCategory('Kategorie:Roman');setBookSearch('');loadBookCatalog(null,'Kategorie:Roman',false,'','wikisource')}}>German Wikisource</button></div>
+                    <div className="catalog-heading"><div><span className="eyebrow">{bookProvider==='gutenberg'?'PUBLIC-DOMAIN FULL TEXTS':'GERMAN SOURCE LIBRARY'}</span><h3>{bookProvider==='gutenberg'?'Novels and complete works.':'Original German literature.'}</h3><p>{bookProvider==='gutenberg'?'Search the German-language Project Gutenberg catalogue. Only entries marked public domain in the US and with older author dates are requested; check individual rights notices before reuse.':'Browse German Wikisource pages. Some entries are fragments or tables of contents, so Fluentio now checks for substantial text before opening them.'}</p></div><div className="catalog-search"><input value={bookSearch} onChange={e=>setBookSearch(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')loadBookCatalog(null,bookCategory,false,bookSearch,bookProvider)}} placeholder="Search book titles or authors..."/><button onClick={()=>loadBookCatalog(null,bookCategory,false,bookSearch,bookProvider)}><Search size={15}/></button></div></div>
+                    <div className="catalog-controls"><select value={bookCategory} onChange={e=>{setBookCategory(e.target.value);loadBookCatalog(null,e.target.value,false,bookSearch,bookProvider)}}>{bookProvider==='gutenberg'?<><option value="all">All German full texts</option><option value="novels">Novels</option><option value="short stories">Short stories</option><option value="fairy tales">Fairy tales</option><option value="fiction">Fiction</option><option value="drama">Drama</option></>:<><option value="Kategorie:Roman">Novels (Romane)</option><option value="Kategorie:Novelle">Novellas (Novellen)</option><option value="Kategorie:Erzählung">Short stories (Erzählungen)</option><option value="Kategorie:Märchen">Fairy tales (Märchen)</option><option value="Kategorie:Sage">Legends (Sagen)</option><option value="Kategorie:Anekdote">Anecdotes (Anekdoten)</option></>}</select><span>{bookCount.toLocaleString()} catalogue matches · 32 books per Gutenberg page</span></div>
+                    {booksError&&<p className="reader-feedback">{booksError}</p>}
+                    {booksLoading&&!bookCatalog.length?<p className="panel-muted">Loading complete books…</p>:<div className="book-grid">{bookCatalog.map(book=><article className="catalog-book" key={book.id||book.pageid||book.title}><span className="book-level">{bookProvider==='gutenberg'?'PROJECT GUTENBERG · GERMAN':'GERMAN WIKISOURCE · SOURCE TEXT'}</span><h4>{book.title}</h4><p>{bookProvider==='gutenberg'?(book.authors||[]).map(author=>author.name).join(', ')||'German-language author':book.snippet?book.snippet.replace(/<[^>]*>/g,'').slice(0,150):'Original German-language literary text.'}</p><small>{bookProvider==='gutenberg'?(book.download_count||0).toLocaleString()+' downloads · full-text edition':'Full text is checked when opened'}</small><div className="catalog-card-actions"><button disabled={bookLoadingId===(book.id||book.pageid||book.title)} onClick={()=>bookProvider==='gutenberg'?openGutenbergBook(book):openWikisourcePage(book)}>{bookLoadingId===(book.id||book.pageid||book.title)?'Loading text…':'Read inside Fluentio'} <ArrowUpRight size={14}/></button>{bookProvider==='gutenberg'&&<a href={'https://www.gutenberg.org/ebooks/'+book.id} target="_blank" rel="noreferrer">Source</a>}{bookProvider==='wikisource'&&<a href={'https://de.wikisource.org/wiki/'+encodeURIComponent(book.title.replaceAll(' ','_'))} target="_blank" rel="noreferrer">Source</a>}</div></article>)}</div>}
+                    {bookNext&&<button className="catalog-more" disabled={booksLoading} onClick={()=>loadBookCatalog(bookNext,bookCategory,true,bookSearch,bookProvider)}>{booksLoading?'Loading…':'Load more complete books'}</button>}
+                    <p className="catalog-note">This library fetches one book at a time from its source rather than copying a publisher’s entire PDF collection. Project Gutenberg states that its copyright determinations are US-based; works may have different rights outside the US, and translations can have separate copyright. Verify the individual ebook notice and local law before redistribution. <a href="https://infobooks.org/free-pdf-books/language-learning/books-in-german/" target="_blank" rel="noreferrer">Browse InfoBooks’ 31-book German PDF collection</a> as an additional discovery source; its free-download status alone does not grant Fluentio a right to rehost every PDF.</p>
+                  </section>
         <div className="source-grid">{filtered.map((item,index)=><article className="source-card" key={item.id}><div className={'card-visual visual-'+item.id}><span className="visual-index">0{index+1}</span><span className="visual-type">{item.type}</span><div className="visual-glyph">{item.id===1?'A':item.id===2?'N':item.id===3?'Ü':'S'}</div></div><div className="card-content"><div className="card-topline"><span className="level-tag">{item.levelLabel}</span><span className="card-language">{item.language}</span></div><h3>{item.title}</h3><p>{item.description}</p><div className="card-footer"><span>{item.tag}</span><button onClick={()=>setSelected(item)} aria-label={'View '+item.title}><ArrowUpRight size={18}/></button></div></div></article>)}</div>
         {filtered.length===0&&<div className="empty-state">No sources match that search. Try another word or level.</div>}
         <div className="library-actions"><div><strong>Already have a German text?</strong><span>Open the interactive reader and explore it word by word.</span></div><button onClick={()=>openReader()}>Open reading workspace <ArrowUpRight size={16}/></button></div>
