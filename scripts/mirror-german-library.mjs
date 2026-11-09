@@ -86,7 +86,7 @@ async function main() {
     'German-language public-domain text editions mirrored for Fluentio Stories. ' +
     'Each text is retained with its Project Gutenberg header and licence notice. ' +
     'Project Gutenberg copyright determinations are US-based; local copyright law and any separate translation rights must be checked. ' +
-    'The in-app cards link to the original ebook landing pages.\\n'
+    'The in-app cards link to the original ebook landing pages.\n'
   )
   console.log('Hosted ' + copied.length + ' full-text books locally.')
   if (copied.length < 5) throw new Error('Too few full texts were mirrored; refusing to publish an almost-empty book shelf.')
