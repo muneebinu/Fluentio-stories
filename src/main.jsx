@@ -68,14 +68,14 @@ function App() {
   const [lookupCache, setLookupCache] = useState(() => { try { return JSON.parse(localStorage.getItem('fluentio-lookup-cache') || '{}') } catch { return {} } })
   const lookupRequest = useRef(0)
 
-  async function loadBookCatalog(url = null, category = bookCategory, append = false) {
+  async function loadBookCatalog(url = null, category = bookCategory, append = false, search = bookSearch) {
     setBooksLoading(true); setBooksError('')
     try {
       let endpoint = url
       if (!endpoint) {
         const params = new URLSearchParams({ action: 'query', format: 'json', origin: '*' })
-        if (bookSearch.trim()) {
-          params.set('list','search'); params.set('srsearch',bookSearch.trim()); params.set('srnamespace','0'); params.set('srlimit','50')
+        if (search.trim()) {
+          params.set('list','search'); params.set('srsearch',search.trim()); params.set('srnamespace','0'); params.set('srlimit','50')
         } else {
           params.set('list','categorymembers'); params.set('cmtitle',category); params.set('cmtype','page'); params.set('cmlimit','50')
         }
@@ -84,9 +84,9 @@ function App() {
       const response = await fetch(endpoint)
       if (!response.ok) throw new Error('Wikisource catalogue returned ' + response.status)
       const data = await response.json()
-      const results = bookSearch.trim() ? (data.query?.search || []) : (data.query?.categorymembers || [])
+      const results = search.trim() ? (data.query?.search || []) : (data.query?.categorymembers || [])
       setBookCatalog(current => append ? [...current, ...results] : results)
-      setBookCount(bookSearch.trim() ? (data.query?.searchinfo?.totalhits || results.length) : 58246)
+      setBookCount(search.trim() ? (data.query?.searchinfo?.totalhits || results.length) : 58246)
       if (data.continue) {
         const params = new URLSearchParams(endpoint.split('?')[1] || '')
         Object.entries(data.continue).forEach(([key,value])=>params.set(key,String(value)))
@@ -96,7 +96,7 @@ function App() {
     finally { setBooksLoading(false) }
   }
 
-  useEffect(() => { loadBookCatalog(null, 'Kategorie:Märchen', false) }, [])
+  useEffect(() => { loadBookCatalog(null, 'Kategorie:Märchen', false, '') }, [])
 
   async function openWikisourcePage(page) {
     setBookLoadingId(page.pageid || page.title); setBooksError('')
@@ -331,7 +331,7 @@ function App() {
         {error&&<p className="reader-feedback">{error}</p>}<div className="reader-divider"/>
         <div className="reading-heading"><span className="eyebrow">INTERACTIVE READING</span><span className="reading-hint"><span className="hint-dot"/> Tap a word to look it up</span><div className="reading-tools"><button onClick={()=>setReaderFontSize(Math.max(14,readerFontSize-1))} aria-label="Decrease text size">A−</button><button onClick={()=>setReaderFontSize(Math.min(28,readerFontSize+1))} aria-label="Increase text size">A+</button>{phraseSelected&&<button className="phrase-lookup" onClick={()=>lookupPhrase(phraseSelected)}>Translate selected phrase</button>}</div></div>
         {readerText.trim()
-          ? <article className="reading-paper" onMouseUp={()=>{const selection=window.getSelection()?.toString().trim()||'';setPhraseSelected(selection.split(/\s+/).length>1?selection:'')}}><h2>{readerTitle || 'German reading'}</h2><p style={{fontSize:readerFontSize+'px'}}>{renderReadableText()}</p></article>
+          ? <article className="reading-paper" onMouseUp={()=>{const selection=window.getSelection()?.toString().trim()||'';setPhraseSelected(selection.split(/\s+/).length>1?selection:'')}}><h2>{readerTitle || 'German reading'} {readerSource&&<a className="reader-source-link" href={readerSource} target="_blank" rel="noreferrer">Original source <ExternalLink size={12}/></a>}</h2><p style={{fontSize:readerFontSize+'px'}}>{renderReadableText()}</p></article>
           : <div className="reader-empty"><BookOpen size={28}/><strong>Your reading will appear here</strong><span>Paste a German passage in the box above to get started.</span></div>}
         <div className="reader-source-note">Use text you wrote yourself, public-domain material, or content whose licence permits this use. For other publishers, read on their original website.</div>
       </section>
@@ -375,7 +375,7 @@ function App() {
           <div className="story-grid">{originalStories.filter(story=>level==='All levels'||story.level===level).map(story=><article className="story-card" key={story.id}><span className="story-level">{story.level} · {story.topic}</span><h4>{story.title}</h4><p>{story.description}</p><button onClick={()=>openReader(story.text,story.title)}>Read story <ArrowUpRight size={15}/></button></article>)}</div>
           {originalStories.filter(story=>level==='All levels'||story.level===level).length===0&&<p className="panel-muted">No original story at this level yet.</p>}
           <div className="catalog-heading"><div><span className="eyebrow">THE CLASSICS COLLECTION</span><h3>German books, stories &amp; legends.</h3><p>Explore the 58,000+ work German Wikisource collection. Browse genres or search titles and authors; open available texts in the Fluentio reader.</p></div><div className="catalog-search"><input value={bookSearch} onChange={e=>setBookSearch(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')loadBookCatalog(null,bookCategory,false)}} placeholder="Search titles and authors..."/><button onClick={()=>loadBookCatalog(null,bookCategory,false)}><Search size={15}/></button></div></div>
-          <div className="catalog-controls"><select value={bookCategory} onChange={e=>{setBookCategory(e.target.value);setBookSearch('');loadBookCatalog(null,e.target.value,false)}}><option value="Kategorie:Märchen">Fairy tales (Märchen)</option><option value="Kategorie:Erzählung">Short stories (Erzählungen)</option><option value="Kategorie:Sage">Legends (Sagen)</option><option value="Kategorie:Novelle">Novellas (Novellen)</option><option value="Kategorie:Roman">Novels (Romane)</option><option value="Kategorie:Anekdote">Anecdotes (Anekdoten)</option></select><span>{bookSearch.trim()?bookCount.toLocaleString()+' search results':'58,000+ works indexed on German Wikisource'}</span></div>
+          <div className="catalog-controls"><select value={bookCategory} onChange={e=>{setBookCategory(e.target.value);setBookSearch('');loadBookCatalog(null,e.target.value,false,'')}}><option value="Kategorie:Märchen">Fairy tales (Märchen)</option><option value="Kategorie:Erzählung">Short stories (Erzählungen)</option><option value="Kategorie:Sage">Legends (Sagen)</option><option value="Kategorie:Novelle">Novellas (Novellen)</option><option value="Kategorie:Roman">Novels (Romane)</option><option value="Kategorie:Anekdote">Anecdotes (Anekdoten)</option></select><span>{bookSearch.trim()?bookCount.toLocaleString()+' search results':'58,000+ works indexed on German Wikisource'}</span></div>
           {booksError&&<p className="reader-feedback">{booksError}</p>}
           {booksLoading&&!bookCatalog.length?<p className="panel-muted">Loading German texts…</p>:<div className="book-grid">{bookCatalog.map(book=><article className="catalog-book" key={book.pageid||book.title}><span className="book-level">GERMAN WIKISOURCE · TEXT</span><h4>{book.title}</h4><p>{book.snippet?book.snippet.replace(/<[^>]*>/g,'').slice(0,130):'A German-language literary work from the Wikisource collection.'}</p><small>Original source transcription</small><button disabled={bookLoadingId===(book.pageid||book.title)} onClick={()=>openWikisourcePage(book)}>{bookLoadingId===(book.pageid||book.title)?'Opening…':'Read inside Fluentio'} <ArrowUpRight size={14}/></button></article>)}</div>}
           {bookNext&&<button className="catalog-more" disabled={booksLoading} onClick={()=>loadBookCatalog(bookNext,bookCategory,true)}>{booksLoading?'Loading…':'Load more texts'}</button>}
