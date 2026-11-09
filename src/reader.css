@@ -149,3 +149,11 @@
 @media(max-width:650px){.featured-reader-shelf{padding:17px;margin:24px -4px 32px}.featured-reader-heading{align-items:flex-start;flex-direction:column}.featured-reader-grid{grid-template-columns:1fr}.featured-reader-card{min-height:0}}
 
 .catalog-source-only{font:9px 'DM Mono',monospace;color:#874F41}
+
+/* Book-like paragraph rhythm for cleaned transcriptions */
+.reading-content{font:17px/2.05 'Playfair Display',serif;color:#244855;overflow-wrap:anywhere}
+.reading-content .reading-paragraph{font:inherit;line-height:inherit;white-space:normal;margin:0 0 1.15em;text-indent:1.25em}
+.reading-content .reading-paragraph:first-child{text-indent:0}
+.reading-content .reading-paragraph:last-child{margin-bottom:0}
+.reading-content .reader-word{font:inherit;line-height:inherit;vertical-align:baseline}
+@media(max-width:650px){.reading-content{font-size:16px;line-height:1.95}.reading-content .reading-paragraph{margin-bottom:1em}}
