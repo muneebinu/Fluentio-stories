@@ -46,3 +46,7 @@
 .library-actions button{display:flex;align-items:center;gap:12px;border:0;background:#244855;color:#FBE9D0;padding:12px 15px;font-size:10px;cursor:pointer;white-space:nowrap}
 @media(max-width:850px){.reader-layout{grid-template-columns:minmax(0,1fr) 280px;gap:20px;padding:30px 18px 55px}}
 @media(max-width:650px){.reader-topbar{height:65px;padding:0 15px;grid-template-columns:1fr auto}.reader-topbar .reader-brand{display:none}.reader-level{font-size:8px}.reader-layout{grid-template-columns:1fr;padding:25px 15px 45px;gap:22px}.word-panel{position:static;min-height:280px}.reading-paper p{font-size:16px;line-height:2}.library-actions{align-items:flex-start;flex-direction:column}.library-actions button{width:100%;justify-content:space-between}.reading-heading{align-items:flex-start;flex-direction:column;gap:8px}}
+
+.reader-toolbar-actions{display:flex;align-items:center;gap:16px}
+.upload-text-button{font:9px 'DM Mono',monospace;color:#244855;cursor:pointer;border-bottom:1px solid rgba(36,72,85,.35);padding:4px 0}
+.upload-text-button input{display:none}
