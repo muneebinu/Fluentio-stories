@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { ArrowLeft, ArrowUpRight, BookOpen, Bookmark, Check, ChevronDown, ExternalLink, Globe2, Search, Sparkles, X, Languages, Volume2, Download, Trash2, RotateCcw, GraduationCap } from 'lucide-react'
 import './styles.css'
 import './reader.css'
+import { originalStories, classicBooks } from './stories.js'
 
 const levels = ['All levels', 'A1', 'A2', 'B1', 'B2']
 
@@ -86,8 +87,6 @@ function App() {
       setBooksError('The German Wikisource catalogue is temporarily unavailable. Please try again.')
     } finally { setBooksLoading(false) }
   }
-
-  useEffect(() => { loadBookCatalog(null, 'Kategorie:Roman', false, '') }, [])
 
   async function openWikisourcePage(page) {
     const title = page.title
@@ -400,7 +399,7 @@ function App() {
     <header className="reader-topbar">
       <button className="back-button" onClick={() => setView('home')}><ArrowLeft size={17}/> Library</button>
       <a className="brand reader-brand" href="#home"><img src="https://raw.githubusercontent.com/muneebinu/Fluentio-Academia/main/assets/logo.png" alt="Fluentio Academia"/><span className="brand-divider"/><span className="brand-name">STORIES</span></a>
-      <div className="reader-nav"><button onClick={()=>setView('texts')}>Saved texts ({savedTexts.length})</button><button onClick={()=>setView('vocab')}>Words ({vocab.length})</button><button onClick={openGrammar}>Grammar</button></div>
+      <div className="reader-nav"><button onClick={()=>setView('texts')}>Saved texts ({savedTexts.length})</button><button onClick={()=>setView('vocab')}>Words ({vocab.length})</button></div>
     </header>
     <main className="reader-layout">
       <section className="reader-main">
@@ -435,47 +434,46 @@ function App() {
   return <div className="app-shell">
     <header className="topbar">
       <a className="brand" href="#home" aria-label="Fluentio Stories home"><img src="https://raw.githubusercontent.com/muneebinu/Fluentio-Academia/main/assets/logo.png" alt="Fluentio Academia"/><span className="brand-divider"/><span className="brand-name">STORIES</span></a>
-      <nav className="nav-links"><a href="#library">Explore</a><a href="#how">How it works</a><button onClick={()=>openReader()}>Reader</button><button onClick={()=>setView('vocab')}>Vocabulary</button><button onClick={openGrammar}>Grammar</button><a href="https://github.com/muneebinu/Fluentio-stories/tree/main/browser-extension" target="_blank" rel="noreferrer">Web Reader</a></nav>
+      <nav className="nav-links"><a href="#library">Explore</a><a href="#how">How it works</a><button onClick={()=>openReader()}>Reader</button><button onClick={()=>setView('vocab')}>Vocabulary</button><button onClick={openGrammar}>Grammar</button></nav>
       <button className="top-cta" onClick={()=>openReader()}>Open reader <ArrowUpRight size={16}/></button>
     </header>
     <main id="home">
       <section className="hero">
         <div className="hero-copy">
-          <div className="eyebrow"><span className="eyebrow-dot"/> GERMAN, ONE STORY AT A TIME</div>
-          <h1>Read more.<br/><em>Understand</em> more.</h1>
-          <p className="hero-description">A better way to build your German — discover reading from A1 to B2, explore real-world language, and grow your vocabulary as you go.</p>
-          <button className="hero-button" onClick={()=>document.getElementById('library')?.scrollIntoView({behavior:'smooth'})}>Explore the library <ArrowUpRight size={17}/></button>
-          <div className="hero-meta"><span><BookOpen size={15}/> In-app stories + public-domain books</span><span><Globe2 size={15}/> A1 — B2</span></div>
+          <div className="eyebrow"><span className="eyebrow-dot"/> GERMAN READING ROOM</div>
+          <h1>One story.<br/><em>One step</em> forward.</h1>
+          <p className="hero-description">Simple German stories for A1, A2 and B1. Read at your own pace, tap a word for its meaning, and enjoy the story.</p>
+          <button className="hero-button" onClick={()=>document.getElementById('library')?.scrollIntoView({behavior:'smooth'})}>Choose a story <ArrowUpRight size={17}/></button>
+          <div className="hero-meta"><span><BookOpen size={15}/> Original learner stories</span><span><Globe2 size={15}/> A1 · A2 · B1</span></div>
         </div>
-        <div className="hero-art" aria-label="Editorial illustration of a reading book"><div className="art-note note-top">LESEN · LERNEN · WACHSEN</div><div className="book-shadow"/><div className="book"><div className="book-label">DEUTSCH<br/>ENTDECKEN</div><div className="book-rule"/><div className="book-lines"><i/><i/><i/><i/></div><div className="book-mark">01 / 04</div></div><div className="art-stamp">WORT<br/>FÜR WORT</div><div className="art-note note-bottom">YOUR NEXT CHAPTER STARTS HERE.</div></div>
+        <div className="hero-art" aria-label="Illustration of an open book"><div className="art-note note-top">LESEN · LERNEN · WACHSEN</div><div className="book-shadow"/><div className="book"><div className="book-label">DEUTSCH<br/>ENTDECKEN</div><div className="book-rule"/><div className="book-lines"><i/><i/><i/><i/></div><div className="book-mark">01 / 03</div></div><div className="art-stamp">WORT<br/>FÜR WORT</div><div className="art-note note-bottom">YOUR NEXT CHAPTER STARTS HERE.</div></div>
       </section>
-      <section className="level-strip" aria-label="Reading levels"><div><span className="strip-label">FIND YOUR LEVEL</span><strong>Start where you are.</strong></div><div className="level-pills">{levels.slice(1).map(l=><button key={l} onClick={()=>{setLevel(l);document.getElementById('library')?.scrollIntoView({behavior:'smooth'})}} className={level===l?'active':''}>{l}</button>)}</div></section>
       <section className="library-section" id="library">
-        <div className="section-heading"><div><div className="eyebrow">THE READING ROOM</div><h2>Find your next read.</h2><p>Browse stories and books you can read right here, plus trusted external learning sources.</p></div><div className="search-wrap"><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search reading sources..." aria-label="Search reading sources"/></div></div>
-        <div className="filters">{levels.map(l=><button key={l} className={level===l?'selected':''} onClick={()=>setLevel(l)}>{l}</button>)}<span className="result-count">{filtered.length} SOURCES</span></div>
-        <section className="in-app-library">
-          <div className="in-app-library-heading"><div><span className="eyebrow">FLUENTIO LONG-FORM LIBRARY</span><h3>Complete German books. Read them here.</h3><p>Search German novels, novellas, fairy tales, legends and short stories. Open available source texts directly in Fluentio; no copying and pasting required.</p></div><span className="library-count">{bookCount.toLocaleString()} MATCHES</span></div>
-          <div className="featured-reader-shelf">
-            <div className="featured-reader-heading"><div><span className="eyebrow">CHOOSE YOUR READING CHALLENGE</span><h3>From simple tales to full novels.</h3><p>These are genre-based reading suggestions, not official CEFR grading. Historical German can still be challenging; use word lookup as you read.</p></div></div>
-            <div className="featured-reader-grid">
-              <article className="featured-reader-card"><div className="featured-reader-topline"><span>A1–A2</span><small>Fables &amp; fairy tales</small></div><h4>Start with shorter tales</h4><p>Browse fables, anecdotes, fairy tales and folk legends. These are reading challenges, not modern graded readers.</p><div className="featured-reader-actions"><button onClick={()=>{setBookCategory('Kategorie:Märchen');setBookSearch('');loadBookCatalog(null,'Kategorie:Märchen',false,'')}}>Explore tales <ArrowUpRight size={14}/></button></div></article>
-              <article className="featured-reader-card"><div className="featured-reader-topline"><span>B1</span><small>Novellas &amp; stories</small></div><h4>Read longer narratives</h4><p>Explore complete novellas and substantial short stories by classic German-language authors.</p><div className="featured-reader-actions"><button onClick={()=>{setBookCategory('Kategorie:Novelle');setBookSearch('');loadBookCatalog(null,'Kategorie:Novelle',false,'')}}>Explore novellas <ArrowUpRight size={14}/></button></div></article>
-              <article className="featured-reader-card"><div className="featured-reader-topline"><span>B2</span><small>Novels</small></div><h4>Take on full novels</h4><p>Browse full novels and longer literary works for sustained reading practice.</p><div className="featured-reader-actions"><button onClick={()=>{setBookCategory('Kategorie:Roman');setBookSearch('');loadBookCatalog(null,'Kategorie:Roman',false,'')}}>Explore novels <ArrowUpRight size={14}/></button></div></article>
-            </div>
-          </div>
-          <div className="catalog-heading"><div><span className="eyebrow">GERMAN WIKISOURCE · LIVE CATALOGUE</span><h3>Find your next book.</h3><p>Browse hundreds of German-language source works. Fluentio checks that a substantial text is available before opening it and caches successful readings in this browser.</p></div><div className="catalog-search"><input value={bookSearch} onChange={e=>setBookSearch(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')loadBookCatalog(null,bookCategory,false,bookSearch)}} placeholder="Search book titles or authors..."/><button onClick={()=>loadBookCatalog(null,bookCategory,false,bookSearch)}><Search size={15}/></button></div></div>
-          <div className="catalog-controls"><select value={bookCategory} onChange={e=>{setBookCategory(e.target.value);loadBookCatalog(null,e.target.value,false,bookSearch)}}><option value="Kategorie:Roman">Novels (Romane)</option><option value="Kategorie:Novelle">Novellas (Novellen)</option><option value="Kategorie:Erzählung">Short stories (Erzählungen)</option><option value="Kategorie:Märchen">Fairy tales (Märchen)</option><option value="Kategorie:Sage">Legends (Sagen)</option><option value="Kategorie:Fabel">Fables (Fabeln)</option><option value="Kategorie:Anekdote">Anecdotes (Anekdoten)</option><option value="Kategorie:Kriminalroman">Crime novels (Kriminalromane)</option></select><span>{bookCount.toLocaleString()} results · load more to browse</span></div>
+        <div className="section-heading"><div><div className="eyebrow">THE READING ROOM</div><h2>Choose your next story.</h2><p>Three original stories, written for German learners. Each one opens directly in the Fluentio reader.</p></div></div>
+        <div className="filters">{['All levels','A1','A2','B1'].map(l=><button key={l} className={level===l?'selected':''} onClick={()=>setLevel(l)}>{l}</button>)}<span className="result-count">{originalStories.filter(s=>level==='All levels'||s.level===level).length} STORIES</span></div>
+        <div className="story-grid">
+          {originalStories.filter(s=>level==='All levels'||s.level===level).map((story,index)=><article className="story-card fluentio-story-card" key={story.id}>
+            <span className="story-level">{story.level} · {story.topic}</span>
+            <h4>{story.title}</h4><p>{story.description}</p>
+            <small>{story.chapters.length} chapters · original Fluentio story</small>
+            <button onClick={()=>openReader(story.chapters.join('\n\n'),story.title,'')}>Read story <ArrowUpRight size={14}/></button>
+          </article>)}
+        </div>
+        <section className="classic-shelf">
+          <div className="section-heading"><div><div className="eyebrow">CLASSIC GERMAN LITERATURE</div><h2>Three classics.</h2><p>For readers who want to try longer, more challenging literature. These are original literary texts, not A1–B1 graded readers.</p></div></div>
+          <div className="classic-grid">{classicBooks.map(book=><article className="classic-card" key={book.id}>
+            <span>{book.level} · {book.author}</span><h3>{book.title}</h3><p>{book.description}</p>
+            <button onClick={()=>openWikisourcePage({title:book.pageTitle.replaceAll('_',' '),pageid:book.id})} disabled={bookLoadingId===book.id}>{bookLoadingId===book.id?'Opening…':'Read in Fluentio'} <ArrowUpRight size={14}/></button>
+            <a href={book.source} target="_blank" rel="noreferrer">Source edition</a>
+          </article>)}</div>
           {booksError&&<p className="reader-feedback">{booksError}</p>}
-          {booksLoading&&!bookCatalog.length?<p className="panel-muted">Loading German books…</p>:<div className="book-grid">{bookCatalog.map(book=><article className="catalog-book" key={book.pageid||book.title}><span className="book-level">GERMAN WIKISOURCE · SOURCE TEXT</span><h4>{book.title}</h4><p>{book.snippet?book.snippet.replace(/<[^>]*>/g,'').slice(0,150):'German-language literary work. Full text is checked when opened.'}</p><small>Open in reader · cached for repeat visits</small><div className="catalog-card-actions"><button disabled={bookLoadingId===(book.pageid||book.title)} onClick={()=>openWikisourcePage(book)}>{bookLoadingId===(book.pageid||book.title)?'Loading text…':'Read inside Fluentio'} <ArrowUpRight size={14}/></button><a href={'https://de.wikisource.org/wiki/'+encodeURIComponent(book.title.replaceAll(' ','_'))} target="_blank" rel="noreferrer">Source</a></div></article>)}</div>}
-          {bookNext&&<button className="catalog-more" disabled={booksLoading} onClick={()=>loadBookCatalog(bookNext,bookCategory,true,bookSearch)}>{booksLoading?'Loading…':'Load more books'}</button>}
-          <p className="catalog-note">Texts are retrieved from German Wikisource and shown inside the Fluentio reader with a source link. Check each source page for its specific public-domain or Creative Commons licence and attribution requirements. <a href="https://infobooks.org/free-pdf-books/language-learning/books-in-german/" target="_blank" rel="noreferrer">Browse InfoBooks’ German PDF collection</a> as an additional discovery source; free download does not automatically grant permission to rehost every PDF.</p>
         </section>
-        <div className="source-grid">{filtered.map((item,index)=><article className="source-card" key={item.id}><div className={'card-visual visual-'+item.id}><span className="visual-index">0{index+1}</span><span className="visual-type">{item.type}</span><div className="visual-glyph">{item.id===1?'A':item.id===2?'N':item.id===3?'Ü':'S'}</div></div><div className="card-content"><div className="card-topline"><span className="level-tag">{item.levelLabel}</span><span className="card-language">{item.language}</span></div><h3>{item.title}</h3><p>{item.description}</p><div className="card-footer"><span>{item.tag}</span><button onClick={()=>setSelected(item)} aria-label={'View '+item.title}><ArrowUpRight size={18}/></button></div></div></article>)}</div>
-        {filtered.length===0&&<div className="empty-state">No sources match that search. Try another word or level.</div>}
-        <div className="library-actions"><div><strong>Already have a German text?</strong><span>Open the interactive reader and explore it word by word.</span></div><button onClick={()=>openReader()}>Open reading workspace <ArrowUpRight size={16}/></button></div>
-        <div className="learning-shortcuts"><button onClick={()=>setView('texts')}><BookOpen size={17}/> Saved readings <span>{savedTexts.length} on this device</span></button><button onClick={()=>setView('vocab')}><Bookmark size={17}/> My vocabulary <span>{vocab.length} saved</span></button><button onClick={()=>setView('flashcards')}><GraduationCap size={17}/> Flashcard practice <span>Review saved words</span></button><button onClick={openGrammar}><Languages size={17}/> Grammar library <span>Rules and examples</span></button></div><p className="library-footnote">We link to original publishers. Content availability, reading levels and reuse permissions are determined by each source.</p>
+        <div className="learning-shortcuts">
+          <button onClick={()=>setView('texts')}><BookOpen size={17}/> Saved readings <span>{savedTexts.length} saved</span></button>
+          <button onClick={()=>setView('vocab')}><Bookmark size={17}/> My vocabulary <span>{vocab.length} words</span></button>
+          <button onClick={()=>setView('flashcards')}><GraduationCap size={17}/> Flashcards <span>Practise saved words</span></button>
+        </div>
       </section>
-      <section className="how-section" id="how"><div className="how-heading"><div className="eyebrow">A SIMPLE WAY TO LEARN</div><h2>Make every word count.</h2></div><div className="how-grid"><div className="how-step"><span>01</span><BookOpen/><h3>Choose a story or book</h3><p>Open original stories and public-domain books right inside Fluentio.</p></div><div className="how-step"><span>02</span><Sparkles/><h3>Explore language</h3><p>Hover over or tap a word to see its English meaning.</p></div><div className="how-step"><span>03</span><Bookmark/><h3>Keep progressing</h3><p>Save useful words, practise with flashcards and export your vocabulary.</p></div></div></section>
     </main>
     <footer><a className="footer-brand" href="#home">FLUENTIO <span>STORIES</span></a><p>Read your way to German.</p><span>© {new Date().getFullYear()} Fluentio Academia</span></footer>
     {selected&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setSelected(null)}}><section className="source-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><button className="modal-close" onClick={()=>setSelected(null)} aria-label="Close"><X size={19}/></button><span className="eyebrow">READING SOURCE · {selected.levelLabel}</span><h2 id="modal-title">{selected.title}</h2><p>{selected.description}</p><div className="modal-note">{selected.note}</div><a className="hero-button" href={selected.url} target="_blank" rel="noreferrer">Visit original source <ExternalLink size={16}/></a><div className="modal-divider"/><button className="reader-open-link" onClick={()=>openReader('',selected.title+' reading')}>Open reader workspace <ArrowUpRight size={15}/></button><p className="modal-small">Read the original publisher's material on its website. Paste text into your reading workspace only where you have permission to do so.</p></section></div>}
