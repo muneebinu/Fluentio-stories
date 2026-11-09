@@ -96,25 +96,33 @@ function App() {
     try {
       const cached = localStorage.getItem(cacheKey)
       if (cached && cached.length >= 6000) { openReader(cached, page.title, source); return }
-      const params = new URLSearchParams({ action:'query', prop:'extracts', explaintext:'1', exsectionformat:'plain', titles:page.title, format:'json', origin:'*' })
-      const response = await fetch('https://de.wikisource.org/w/api.php?' + params.toString())
-      if (!response.ok) throw new Error('Wikisource text unavailable')
+      // Ask MediaWiki for formatversion 2 so parse.text is a plain HTML string.
+      // Older response formats can wrap parse.text in an object, which made the
+      // previous reader silently treat every book as an empty page.
+      const params = new URLSearchParams({ action:'query', prop:'extracts', explaintext:'1', exsectionformat:'plain', titles:page.title, format:'json', formatversion:'2', origin:'*' })
+      const response = await fetch('https://de.wikisource.org/w/api.php?' + params.toString(), { signal: AbortSignal.timeout(20000) })
+      if (!response.ok) throw new Error('Wikisource text request returned ' + response.status)
       const data = await response.json()
-      const article = Object.values(data.query?.pages || {})[0]
+      const pages = data.query?.pages || []
+      const article = Array.isArray(pages) ? pages[0] : Object.values(pages)[0]
       let text = (article?.extract || '').trim()
-      if (text.length < 6000) {
-        const parseParams = new URLSearchParams({ action:'parse', page:page.title, prop:'text', format:'json', origin:'*' })
-        const parsed = await fetch('https://de.wikisource.org/w/api.php?' + parseParams.toString())
-        if (parsed.ok) {
-          const parsedData = await parsed.json()
-          const html = parsedData.parse?.text || ''
+      // The extracts extension often returns only an introductory excerpt for
+      // transcluded Wikisource works. Parse the rendered page for the full text.
+      if (text.length < 12000) {
+        const parseParams = new URLSearchParams({ action:'parse', pageid:String(page.pageid || ''), page:page.title, prop:'text', format:'json', formatversion:'2', redirects:'1', origin:'*' })
+        const parsed = await fetch('https://de.wikisource.org/w/api.php?' + parseParams.toString(), { signal: AbortSignal.timeout(30000) })
+        if (!parsed.ok) throw new Error('Wikisource page parser returned ' + parsed.status)
+        const parsedData = await parsed.json()
+        const parseText = parsedData.parse?.text
+        const html = typeof parseText === 'string' ? parseText : (parseText?.['*'] || '')
+        if (html) {
           const doc = new DOMParser().parseFromString(html,'text/html')
-          doc.querySelectorAll('script,style,nav,header,footer,.mw-editsection,.references,.reflist,.navbox,.catlinks,.toc').forEach(node=>node.remove())
+          doc.querySelectorAll('script,style,nav,header,footer,.mw-editsection,.references,.reflist,.navbox,.catlinks,.toc,.ws-noexport').forEach(node=>node.remove())
           const expanded = (doc.querySelector('.mw-parser-output') || doc.body)?.innerText || ''
           if (expanded.trim().length > text.length) text = expanded.trim()
         }
       }
-      if (text.length < 6000) throw new Error('No substantial full-text transcription')
+      if (text.length < 400) throw new Error('The source page has no readable transcription')
       if (text.length > 1500000) text = text.slice(0,1500000) + '\n\n[The browser reader has shortened this very large text. Open the source edition for the complete work.]'
       try { localStorage.setItem(cacheKey, text) } catch {}
       openReader(text, page.title, source)
