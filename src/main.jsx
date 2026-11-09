@@ -90,6 +90,21 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'instant' })
   }
 
+  async function loadTextFile(file) {
+    if (!file) return
+    if (!file.name.toLowerCase().endsWith('.txt')) {
+      setError('Please choose a plain .txt file.')
+      return
+    }
+    const text = await file.text()
+    setReaderText(text)
+    if (!readerTitle) setReaderTitle(file.name.replace(/\\.txt$/i, ''))
+    setActiveWord('')
+    setTranslation('')
+    setDictionary('')
+    setError('')
+  }
+
   async function copyWord() {
     try {
       await navigator.clipboard.writeText(activeWord)
