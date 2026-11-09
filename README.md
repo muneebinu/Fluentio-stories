@@ -16,7 +16,7 @@ A German reading and vocabulary workspace for learners from A1 to B2, built with
 - Save reading texts and vocabulary locally in the browser.
 - Review saved vocabulary with flashcards and interval-based review scheduling.
 - Export saved words as CSV.
-- German text-to-speech using the browser's speech synthesis engine.\n- A Chrome/Edge Manifest V3 web-reader extension for selected words and phrases on other webpages, with its own local vocabulary and CSV export.
+- German word and full-passage read-aloud using the browser's speech synthesis engine.\n- Adjustable reading font size.\n- A Chrome/Edge Manifest V3 web-reader extension for selected words and phrases on other webpages, with its own local vocabulary and CSV export.
 - Browse a grammar library using the German Language API.
 - No account or registration required.
 
