@@ -37,7 +37,7 @@ async function mirrorCuratedGutenberg() {
   mkdirSync(mirrorDir, { recursive: true })
   const ids = curated.map(book => book.id)
   const acceptRegex = '.*(' + ids.join('|') + ').*\\.txt$'
-  const harvestUrl = 'https://www.gutenberg.org/robot/harvest?filetypes[]=txt&langs[]=de'
+  const harvestUrl = 'https://www.gutenberg.org/robot/harvest?filetypes%5B%5D=txt&langs%5B%5D=de'
   try {
     console.log('Requesting the seven curated reader files through Project Gutenberg’s documented robot-harvest route.')
     execFileSync('wget', ['--wait=2', '--mirror', '--span-hosts', '--accept-regex=' + acceptRegex, '--directory-prefix=' + mirrorDir, harvestUrl], { stdio: 'inherit' })
@@ -61,49 +61,81 @@ async function mirrorCuratedGutenberg() {
 async function fetchWikisourceCategory(category) {
   const params = new URLSearchParams({
     action: 'query',
-    generator: 'categorymembers',
-    gcmtitle: category,
-    gcmtype: 'page',
-    gcmlimit: '100',
-    prop: 'extracts',
-    explaintext: '1',
-    exsectionformat: 'plain',
+    list: 'categorymembers',
+    cmtitle: category,
+    cmtype: 'page',
+    cmlimit: '100',
     format: 'json',
     origin: '*'
   })
   const response = await fetch('https://de.wikisource.org/w/api.php?' + params.toString(), { headers: apiHeaders })
   if (!response.ok) throw new Error('Wikisource category ' + category + ' returned ' + response.status)
   const data = await response.json()
+  if (data.error) throw new Error(data.error.info || 'Wikisource API error')
+  return data.query?.categorymembers || []
+}
+
+async function fetchWikisourceExtracts(titles) {
+  const params = new URLSearchParams({
+    action: 'query',
+    prop: 'extracts',
+    titles: titles.join('|'),
+    explaintext: '1',
+    exsectionformat: 'plain',
+    exlimit: '20',
+    format: 'json',
+    origin: '*'
+  })
+  const response = await fetch('https://de.wikisource.org/w/api.php?' + params.toString(), { headers: apiHeaders })
+  if (!response.ok) throw new Error('Wikisource text request returned ' + response.status)
+  const data = await response.json()
+  if (data.error) throw new Error(data.error.info || 'Wikisource extract error')
   return Object.values(data.query?.pages || {})
+}
+
+function levelForCategory(category) {
+  if (/Märchen|Sage|Fabel|Anekdote/.test(category)) return 'A2 challenge'
+  if (/Erzählung|Novelle/.test(category)) return 'B1 challenge'
+  if (/Roman|Kriminalroman/.test(category)) return 'B2 challenge'
+  return 'Reading challenge'
 }
 
 async function mirrorWikisource() {
   const found = new Map()
   for (const category of categories) {
     try {
-      const pages = await fetchWikisourceCategory(category)
-      for (const page of pages) {
-        const title = page.title || ''
-        const text = (page.extract || '').trim()
-        if (!page.pageid || !title || title.includes(':') || text.length < 6000) continue
-        if (found.has(page.pageid)) continue
-        const id = 'ws-' + page.pageid
-        const sourceUrl = 'https://de.wikisource.org/wiki/' + encodeURIComponent(title.replaceAll(' ', '_'))
-        const authorMatch = text.match(/(?:Autor|Verfasser)[:：]\s*([^\n]+)/i)
-        const authors = [{ name: authorMatch?.[1]?.trim() || 'Wikisource edition' }]
-        const wordCount = text.split(/\s+/).filter(Boolean).length
-        found.set(page.pageid, {
-          id, title, authors, subjects: [category.replace('Kategorie:', '')],
-          provider: 'wikisource', sourceUrl, word_count: wordCount
-        })
-        writeFileSync(join(outputDir, id + '.txt'), text, 'utf8')
+      const members = await fetchWikisourceCategory(category)
+      const titles = members.map(page => page.title).filter(title => title && !title.includes(':'))
+      console.log('Wikisource category ' + category + ': ' + titles.length + ' candidate works.')
+      for (let start = 0; start < titles.length && found.size < 150; start += 20) {
+        const batch = titles.slice(start, start + 20)
+        const pages = await fetchWikisourceExtracts(batch)
+        for (const page of pages) {
+          const title = page.title || ''
+          const text = (page.extract || '').trim()
+          if (!page.pageid || !title || text.length < 6000 || found.has(page.pageid)) continue
+          const id = 'ws-' + page.pageid
+          const sourceUrl = 'https://de.wikisource.org/wiki/' + encodeURIComponent(title.replaceAll(' ', '_'))
+          const authorMatch = text.match(/(?:Autor|Verfasser)[:：]\s*([^\n]+)/i)
+          const authors = [{ name: authorMatch?.[1]?.trim() || 'Wikisource edition' }]
+          const wordCount = text.split(/\s+/).filter(Boolean).length
+          found.set(page.pageid, {
+            id, title, authors, subjects: [category.replace('Kategorie:', '')],
+            provider: 'wikisource', sourceUrl, word_count: wordCount,
+            level: levelForCategory(category)
+          })
+          writeFileSync(join(outputDir, id + '.txt'), text, 'utf8')
+        }
         if (found.size >= 150) break
+        await new Promise(resolve => setTimeout(resolve, 1000))
       }
       if (found.size >= 150) break
+      await new Promise(resolve => setTimeout(resolve, 1000))
     } catch (error) {
       console.warn('Skipping Wikisource category ' + category + ': ' + error.message)
     }
   }
+  console.log('Wikisource contributed ' + found.size + ' substantial full texts.')
   return [...found.values()]
 }
 
