@@ -4,11 +4,11 @@ A German reading and vocabulary workspace for learners from A1 to B2, built with
 
 ## Long-form reading library
 
-- The deployment build mirrors up to 150 substantial German-language texts from German Wikisource into the site's own `public/books` directory. The reader loads those local files, so a book marked **Read inside Fluentio** does not wait for a third-party text download.
-- The mirror collects complete works from Wikisource categories for novels, novellas, stories, fairy tales, legends, fables and anecdotes. Short entries and fragments under the minimum text length are excluded.
-- Each locally hosted work includes a source-page URL and its title/author metadata where available. The UI displays word count and an approximate page count (250 words per reading page), and includes a **Long reads (40+ pages)** filter.
+- The homepage includes an in-app German Wikisource catalogue. Browse novels, novellas, stories, fairy tales, legends, fables and anecdotes; search titles and authors; and paginate through category results.
+- Open a source work directly inside the Fluentio reader. The reader first requests the plain-text extract and falls back to the rendered source page when the extract is incomplete.
+- Fluentio rejects very short entries and fragments rather than presenting them as complete books. Successfully opened texts are cached in the current browser for faster repeat visits.
+- The reader shows the word count and an approximate page count (250 words per reading page). This helps identify longer works, but it is not a publisher's printed page count.
 - Suggested A1–A2, B1 and B2 shelves are genre-based reading challenges, not official CEFR classifications. Historical German can be difficult even in fairy tales and fables; use the word lookup while reading.
-- A separate live German Wikisource search remains available for additional works that are not in the local mirror. Some entries are fragments or contents pages; Fluentio checks for substantial text before opening them.
 - The InfoBooks German PDF collection is linked as an additional discovery source. A free download does not automatically grant Fluentio permission to rehost a PDF; verify each title's rights and licence before copying or redistributing it.
 
 ## Reader and vocabulary
@@ -25,15 +25,16 @@ A German reading and vocabulary workspace for learners from A1 to B2, built with
 
 ## Content, licensing and attribution
 
-German Wikisource contains public-domain and Creative Commons works. Fluentio retains each text's original source attribution and links back to the individual source page. Check the source page for the specific licence and attribution/share-alike requirements before reuse or redistribution. Copyright status can differ by country.
+German Wikisource contains public-domain and Creative Commons works. Fluentio links to each individual source page and displays the retrieved text in its own reader. Check the source page for the specific licence and attribution/share-alike requirements before reuse or redistribution. Copyright status can differ by country.
 
 The InfoBooks page lists free-to-download PDFs, but that does not grant Fluentio a blanket right to republish every title. External publisher materials are linked, not copied into Fluentio Stories.
 
 ## Data and technical limitations
 
 - Saved vocabulary and readings are stored in browser `localStorage`; they are not synced between devices.
+- Opened source texts and word lookups are cached locally in the current browser.
 - Dictionary and translation services are third-party services. Their availability, rate limits, CORS policies and responses can change. Translations are aids, not guaranteed linguistic judgments.
-- The local book count depends on the substantial full texts available in the selected Wikisource categories at mirror time.
+- Not every Wikisource entry has a complete transcription; Fluentio rejects short entries, but some source pages may still be incomplete or unavailable.
 - The app has no backend, user accounts, shared vocabulary sync, or server-side translation cache.
 - The flashcard scheduler is a lightweight interval system, not a validated SM-2 implementation.
 
@@ -49,4 +50,4 @@ npm run dev
 npm run build
 ```
 
-GitHub Pages deployment is configured through GitHub Actions. The deployment workflow runs `scripts/mirror-german-library.mjs` before building.
+GitHub Pages deployment is configured through GitHub Actions.
