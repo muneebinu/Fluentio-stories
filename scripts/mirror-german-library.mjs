@@ -17,11 +17,11 @@ const germanAuthorHints = [
   'Adalbert', 'Jeremias', 'Hermann', 'Walther von der Vogelweide'
 ]
 
-async function collectIds() {
-  const ids = [...curatedIds]
+async function collectBooks() {
+  const books = []
   let next = 'https://gutendex.com/books/?languages=de&mime_type=text%2Fplain&copyright=false&author_year_end=1955'
   let pages = 0
-  while (next && pages < 40 && ids.length < 160) {
+  while (next && pages < 40 && books.length < 160) {
     const response = await fetch(next)
     if (!response.ok) throw new Error('Gutendex catalogue request failed: ' + response.status)
     const data = await response.json()
@@ -31,12 +31,18 @@ async function collectIds() {
       const oldEnough = authors.length > 0 && authors.every(author => Number.isFinite(author.death_year) && author.death_year <= 1955)
       const knownGermanAuthor = names.some(name => germanAuthorHints.some(hint => name.toLowerCase().includes(hint.toLowerCase())))
       const hasPlainText = Object.keys(book.formats || {}).some(type => type.startsWith('text/plain'))
-      if (oldEnough && knownGermanAuthor && hasPlainText) ids.push(book.id)
+      if (oldEnough && knownGermanAuthor && hasPlainText) books.push(book)
     }
     next = data.next
     pages += 1
   }
-  return [...new Set(ids)].slice(0, 160)
+  const curatedResponse = await fetch('https://gutendex.com/books/?ids=' + curatedIds.join(','))
+  if (curatedResponse.ok) {
+    const curatedData = await curatedResponse.json()
+    for (const book of curatedData.results || []) books.push(book)
+  }
+  const unique = [...new Map(books.map(book => [book.id, book])).values()]
+  return unique.slice(0, 160)
 }
 
 function walk(dir) {
@@ -50,7 +56,8 @@ function walk(dir) {
 async function main() {
   mkdirSync(mirrorDir, { recursive: true })
   mkdirSync(outputDir, { recursive: true })
-  const ids = await collectIds()
+  const books = await collectBooks()
+  const ids = books.map(book => book.id)
   if (!ids.length) throw new Error('No German public-domain book IDs were selected')
 
   const idPattern = ids.join('|')
@@ -76,7 +83,8 @@ async function main() {
     copyFileSync(matches[0], destination)
     copied.push(id)
   }
-  writeFileSync(join(outputDir, 'index.json'), JSON.stringify({ ids: copied, count: copied.length }, null, 2))
+  const copiedBooks = books.filter(book => copied.includes(book.id)).map(book => ({ id: book.id, title: book.title, authors: book.authors || [], subjects: book.subjects || [], download_count: book.download_count || 0 }))
+  writeFileSync(join(outputDir, 'index.json'), JSON.stringify({ ids: copied, count: copied.length, books: copiedBooks }, null, 2))
   writeFileSync(join(outputDir, 'NOTICE.txt'),
     'German-language public-domain text editions mirrored for Fluentio Stories. ' +
     'Each text is retained with its Project Gutenberg header and licence notice. ' +
