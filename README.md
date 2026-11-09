@@ -13,7 +13,7 @@ A German reading and vocabulary workspace for learners from A1 to B2, built with
   - German Language API for CEFR vocabulary, part of speech, gender and example sentences.
   - MyMemory as a translation fallback.
   - German Wiktionary MediaWiki API as a dictionary-extract fallback.
-- Save vocabulary locally in the browser.
+- Save reading texts and vocabulary locally in the browser.
 - Review saved vocabulary with flashcards and interval-based review scheduling.
 - Export saved words as CSV.
 - German text-to-speech using the browser's speech synthesis engine.\n- A Chrome/Edge Manifest V3 web-reader extension for selected words and phrases on other webpages, with its own local vocabulary and CSV export.
@@ -22,7 +22,7 @@ A German reading and vocabulary workspace for learners from A1 to B2, built with
 
 ## Browser extension\n\nThe `browser-extension/` folder contains a Chrome/Edge Manifest V3 extension. It looks up only text selected by the learner on a webpage; it does not bulk-copy publisher pages. See [browser-extension/README.md](browser-extension/README.md) for local installation.\n\n## Local-first data
 
-Vocabulary is stored in the current browser using `localStorage`. It is not synced between devices and can be lost if browser site data is cleared. CSV export is provided for backups. This version has no user accounts or cloud database.
+Saved readings and vocabulary are stored in the current browser using `localStorage`. It is not synced between devices and can be lost if browser site data is cleared. CSV export is provided for backups. This version has no user accounts or cloud database.
 
 ## API services and limits
 
