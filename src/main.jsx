@@ -59,8 +59,8 @@ function App() {
   const [booksLoading, setBooksLoading] = useState(false)
   const [booksError, setBooksError] = useState('')
   const [bookLoadingId, setBookLoadingId] = useState(null)
-  const [bookCategory, setBookCategory] = useState('all')
-  const [bookProvider, setBookProvider] = useState('gutenberg')
+  const [bookCategory, setBookCategory] = useState('Kategorie:Novelle')
+  const [bookProvider, setBookProvider] = useState('wikisource')
   const [readerSource, setReaderSource] = useState('')
   const [lookupCache, setLookupCache] = useState(() => { try { return JSON.parse(localStorage.getItem('fluentio-lookup-cache') || '{}') } catch { return {} } })
   const lookupRequest = useRef(0)
@@ -119,6 +119,8 @@ function App() {
     } finally { setBooksLoading(false) }
   }
 
+  useEffect(() => { loadBookCatalog(null, 'Kategorie:Novelle', false, '', 'wikisource') }, [])
+
   useEffect(() => {
     fetch(import.meta.env.BASE_URL + 'books/index.json')
       .then(response => { if (!response.ok) throw new Error('Local book index is not available'); return response.json() })
@@ -127,13 +129,14 @@ function App() {
         const ids = data.ids || books.map(book => book.id)
         setLocalBookCatalog(books)
         setLocalBookIds(ids)
-        setBookCatalog(books.slice(0,32))
-        setBookCount(books.length)
-        setBookNext(books.length > 32 ? 'local:32' : null)
       })
-      .catch(() => setBooksError('The local book shelf has not been generated yet. The deployment build must mirror the licensed full-text collection first.'))
+      .catch(() => { setLocalBookCatalog([]); setLocalBookIds([]) })
       .finally(() => setLocalBooksLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (bookProvider === 'gutenberg' && !localBooksLoading) loadBookCatalog(null, bookCategory, false, bookSearch, 'gutenberg')
+  }, [bookProvider, localBookCatalog, localBooksLoading])
 
   async function openGutenbergBook(book) {
     const source = book.sourceUrl || ('https://www.gutenberg.org/ebooks/' + book.id)
@@ -448,9 +451,9 @@ function App() {
                     <div className="featured-reader-shelf">
             <div className="featured-reader-heading"><div><span className="eyebrow">CHOOSE YOUR READING CHALLENGE</span><h3>From simple tales to full novels.</h3><p>These are genre-based reading suggestions, not official CEFR grading. Every hosted text is a complete source transcription; the reader shows word count and an approximate page estimate.</p></div><span className="library-count">{localBookIds.length.toLocaleString()} FULL TEXTS</span></div>
             <div className="featured-reader-grid">
-              <article className="featured-reader-card"><div className="featured-reader-topline"><span>A1–A2</span><small>Fables &amp; fairy tales</small></div><h4>Start with shorter tales</h4><p>Browse fables, anecdotes, fairy tales and folk legends. Historical wording can still be challenging.</p><div className="featured-reader-actions"><button onClick={()=>{setBookProvider('gutenberg');setBookCategory('a1-a2');setBookSearch('');loadBookCatalog(null,'a1-a2',false,'','gutenberg')}}>Explore A1–A2 <ArrowUpRight size={14}/></button></div></article>
-              <article className="featured-reader-card"><div className="featured-reader-topline"><span>B1</span><small>Novellas &amp; stories</small></div><h4>Read longer narratives</h4><p>Explore complete novellas and substantial short stories by classic German-language authors.</p><div className="featured-reader-actions"><button onClick={()=>{setBookProvider('gutenberg');setBookCategory('b1');setBookSearch('');loadBookCatalog(null,'b1',false,'','gutenberg')}}>Explore B1 <ArrowUpRight size={14}/></button></div></article>
-              <article className="featured-reader-card"><div className="featured-reader-topline"><span>B2</span><small>Novels</small></div><h4>Take on full novels</h4><p>Browse complete novels and longer literary works for sustained reading practice.</p><div className="featured-reader-actions"><button onClick={()=>{setBookProvider('gutenberg');setBookCategory('b2');setBookSearch('');loadBookCatalog(null,'b2',false,'','gutenberg')}}>Explore B2 <ArrowUpRight size={14}/></button></div></article>
+              <article className="featured-reader-card"><div className="featured-reader-topline"><span>A1–A2</span><small>Fables &amp; fairy tales</small></div><h4>Start with shorter tales</h4><p>Browse fables, anecdotes, fairy tales and folk legends. Historical wording can still be challenging.</p><div className="featured-reader-actions"><button onClick={()=>{setBookProvider('wikisource');setBookCategory('Kategorie:Märchen');setBookSearch('');loadBookCatalog(null,'Kategorie:Märchen',false,'','wikisource')}}>Explore A1–A2 <ArrowUpRight size={14}/></button></div></article>
+              <article className="featured-reader-card"><div className="featured-reader-topline"><span>B1</span><small>Novellas &amp; stories</small></div><h4>Read longer narratives</h4><p>Explore complete novellas and substantial short stories by classic German-language authors.</p><div className="featured-reader-actions"><button onClick={()=>{setBookProvider('wikisource');setBookCategory('Kategorie:Novelle');setBookSearch('');loadBookCatalog(null,'Kategorie:Novelle',false,'','wikisource')}}>Explore B1 <ArrowUpRight size={14}/></button></div></article>
+              <article className="featured-reader-card"><div className="featured-reader-topline"><span>B2</span><small>Novels</small></div><h4>Take on full novels</h4><p>Browse complete novels and longer literary works for sustained reading practice.</p><div className="featured-reader-actions"><button onClick={()=>{setBookProvider('wikisource');setBookCategory('Kategorie:Roman');setBookSearch('');loadBookCatalog(null,'Kategorie:Roman',false,'','wikisource')}}>Explore B2 <ArrowUpRight size={14}/></button></div></article>
             </div>
           </div>
           <div className="library-provider-tabs"><button className={bookProvider==='gutenberg'?'active':''} onClick={()=>{setBookProvider('gutenberg');setBookCategory('all');setBookSearch('');loadBookCatalog(null,'all',false,'','gutenberg')}}>Full books · Hosted by Fluentio</button><button className={bookProvider==='wikisource'?'active':''} onClick={()=>{setBookProvider('wikisource');setBookCategory('Kategorie:Roman');setBookSearch('');loadBookCatalog(null,'Kategorie:Roman',false,'','wikisource')}}>German Wikisource</button></div>
