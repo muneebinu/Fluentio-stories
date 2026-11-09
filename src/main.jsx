@@ -155,17 +155,17 @@ function App() {
           // Extract prose blocks separately: scanned-page headers, page numbers
           // and line breaks should not be merged into the story.
           const blocks = [...content.querySelectorAll('h2,h3,h4,p,blockquote,li')]
-            .map(node => (node.innerText || node.textContent || '').replace(/\\u00a0/g, ' ').replace(/\\s+/g, ' ').trim())
-            .filter(value => value.length > 35 && !/^\\[?\\d{1,4}\\]?$/.test(value))
-          let rendered = blocks.join('\\n\\n')
+            .map(node => (node.innerText || node.textContent || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim())
+            .filter(value => value.length > 35 && !/^\[?\d{1,4}\]?$/.test(value))
+          let rendered = blocks.join('\n\n')
           if (rendered.length < 400) {
             rendered = (content?.innerText || content?.textContent || '')
-              .replace(/\\u00a0/g, ' ')
-              .split('\\n')
+              .replace(/\u00a0/g, ' ')
+              .split('\n')
               .map(line => line.trim())
-              .filter(line => line && !/^\\d{1,4}$/.test(line))
+              .filter(line => line && !/^\d{1,4}$/.test(line))
               .join(' ')
-              .replace(/\\s+/g, ' ')
+              .replace(/\s+/g, ' ')
           }
           if (rendered.length > text.length) text = rendered
         }
@@ -379,10 +379,10 @@ function App() {
   }
 
   function renderReadableText() {
-    const paragraphs = readerText.split(/\\n\\s*\\n/).map(part => part.trim()).filter(Boolean)
+    const paragraphs = readerText.split(/\n\s*\n/).map(part => part.trim()).filter(Boolean)
     return paragraphs.map((paragraph, paragraphIndex) => {
-      const tokens = paragraph.split(/([\\p{L}\\p{M}]+(?:[-’'][\\p{L}\\p{M}]+)*)/gu)
-      return <p className="reading-paragraph" key={paragraphIndex}>{tokens.map((token, index) => /^[\\p{L}\\p{M}]+(?:[-’'][\\p{L}\\p{M}]+)*$/u.test(token)
+      const tokens = paragraph.split(/([\p{L}\p{M}]+(?:[-’'][\p{L}\p{M}]+)*)/gu)
+      return <p className="reading-paragraph" key={paragraphIndex}>{tokens.map((token, index) => /^[\p{L}\p{M}]+(?:[-’'][\p{L}\p{M}]+)*$/u.test(token)
         ? <button className={'reader-word' + (activeWord.toLocaleLowerCase() === token.toLocaleLowerCase() ? ' word-active' : '')} key={index} onClick={() => lookupWord(token)}>{token}</button>
         : <React.Fragment key={index}>{token}</React.Fragment>)}</p>
     })
