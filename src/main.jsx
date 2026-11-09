@@ -21,6 +21,12 @@ const sources = [
   { id: 10, title: 'German literature · Gutenberg', description: 'A large collection of German-language books and literary works. Difficulty varies.', levelLabel: 'B2+', levels: ['B2'], type: 'Classic literature', language: 'German', url: 'https://www.gutenberg.org/browse/languages/de', tag: 'Original literature', note: 'Check copyright status of each individual work before reuse.' },
 ]
 
+const featuredReads = [
+  { title: 'Meine Stadt', level: 'A1', topic: 'Everyday life · Places', url: 'https://german.net/reading/meine-stadt/' },
+  { title: 'Unser Haus', level: 'A1', topic: 'Home · Family', url: 'https://german.net/reading/unser-haus/' },
+  { title: 'In der Schule', level: 'A2', topic: 'Education · Daily routines', url: 'https://german.net/reading/schule/' },
+]
+
 const starterText = 'Fügen Sie hier einen deutschen Text ein, den Sie lesen möchten. Wählen Sie anschließend ein Wort aus, um seine Bedeutung nachzuschlagen.'
 
 function App() {
@@ -45,6 +51,7 @@ function App() {
   const [flashIndex, setFlashIndex] = useState(0)
   const [showAnswer, setShowAnswer] = useState(false)
   const [reviewed, setReviewed] = useState(0)
+  const [phraseSelected, setPhraseSelected] = useState('')
 
   function persistVocab(next) { setVocab(next); localStorage.setItem('fluentio-vocab', JSON.stringify(next)) }
   function saveActiveWord() {
@@ -90,6 +97,21 @@ function App() {
     const matchesQuery = (item.title + ' ' + item.description + ' ' + item.type).toLowerCase().includes(query.toLowerCase())
     return matchesLevel && matchesQuery
   }), [level, query])
+
+  async function lookupPhrase(value) {
+    const phrase = value.trim().replace(/\s+/g, ' ').slice(0,180)
+    if (!phrase) return
+    setActiveWord(phrase); setTranslation(''); setDictionary(''); setLexical(null); setError(''); setLoading(true)
+    try {
+      const url = new URL('https://api.mymemory.translated.net/get')
+      url.searchParams.set('q', phrase); url.searchParams.set('langpair', 'de|en')
+      const response = await fetch(url)
+      if (!response.ok) throw new Error('Translation service unavailable')
+      const data = await response.json()
+      setTranslation(data?.responseData?.translatedText || 'No phrase translation returned.')
+    } catch { setError('Phrase translation is temporarily unavailable.') }
+    finally { setLoading(false) }
+  }
 
   async function lookupWord(value) {
     const clean = value.trim().replace(/[^\\p{L}\\p{M}-]/gu, '')
@@ -208,9 +230,9 @@ function App() {
         <textarea className="reader-paste" value={readerText} onChange={e=>setReaderText(e.target.value)} placeholder="Paste your German text here…" aria-label="German reading text"/>
         <div className="reader-toolbar"><span>{readerText.trim() ? readerText.trim().split(/\s+/).length + ' words' : 'Your text stays in this browser session.'}</span><div className="reader-toolbar-actions"><label className="upload-text-button">Upload .txt<input type="file" accept=".txt,text/plain" onChange={e=>loadTextFile(e.target.files?.[0])}/></label><button onClick={()=>{setReaderText('');setReaderTitle('');setActiveWord('')}}>Clear text</button></div></div>
         <div className="reader-divider"/>
-        <div className="reading-heading"><span className="eyebrow">INTERACTIVE READING</span><span className="reading-hint"><span className="hint-dot"/> Tap a word to look it up</span></div>
+        <div className="reading-heading"><span className="eyebrow">INTERACTIVE READING</span><span className="reading-hint"><span className="hint-dot"/> Tap a word to look it up</span>{phraseSelected&&<button className="phrase-lookup" onClick={()=>lookupPhrase(phraseSelected)}>Translate selected phrase</button>}</div>
         {readerText.trim()
-          ? <article className="reading-paper"><h2>{readerTitle || 'German reading'}</h2><p>{renderReadableText()}</p></article>
+          ? <article className="reading-paper" onMouseUp={()=>{const selection=window.getSelection()?.toString().trim()||'';setPhraseSelected(selection.split(/\s+/).length>1?selection:'')}}><h2>{readerTitle || 'German reading'}</h2><p>{renderReadableText()}</p></article>
           : <div className="reader-empty"><BookOpen size={28}/><strong>Your reading will appear here</strong><span>Paste a German passage in the box above to get started.</span></div>}
         <div className="reader-source-note">Use text you wrote yourself, public-domain material, or content whose licence permits this use. For other publishers, read on their original website.</div>
       </section>
@@ -252,7 +274,7 @@ function App() {
         <div className="source-grid">{filtered.map((item,index)=><article className="source-card" key={item.id}><div className={'card-visual visual-'+item.id}><span className="visual-index">0{index+1}</span><span className="visual-type">{item.type}</span><div className="visual-glyph">{item.id===1?'A':item.id===2?'N':item.id===3?'Ü':'S'}</div></div><div className="card-content"><div className="card-topline"><span className="level-tag">{item.levelLabel}</span><span className="card-language">{item.language}</span></div><h3>{item.title}</h3><p>{item.description}</p><div className="card-footer"><span>{item.tag}</span><button onClick={()=>setSelected(item)} aria-label={'View '+item.title}><ArrowUpRight size={18}/></button></div></div></article>)}</div>
         {filtered.length===0&&<div className="empty-state">No sources match that search. Try another word or level.</div>}
         <div className="library-actions"><div><strong>Already have a German text?</strong><span>Open the interactive reader and explore it word by word.</span></div><button onClick={()=>openReader()}>Open reading workspace <ArrowUpRight size={16}/></button></div>
-        <div className="learning-shortcuts"><button onClick={()=>setView('vocab')}><Bookmark size={17}/> My vocabulary <span>{vocab.length} saved</span></button><button onClick={()=>setView('flashcards')}><GraduationCap size={17}/> Flashcard practice <span>Review saved words</span></button><button onClick={openGrammar}><Languages size={17}/> Grammar library <span>Rules and examples</span></button></div><p className="library-footnote">We link to original publishers. Content availability, reading levels and reuse permissions are determined by each source.</p>
+        <section className="featured-reading"><div className="eyebrow">HAND-PICKED STARTING POINTS</div><h3>Start with a real text.</h3><div className="featured-read-grid">{featuredReads.map(item=><article key={item.title}><span>{item.level} · {item.topic}</span><strong>{item.title}</strong><a href={item.url} target="_blank" rel="noreferrer">Read at German.net <ExternalLink size={13}/></a></article>)}</div><p>These are links to the original publisher. Their texts are not copied into Fluentio Stories.</p></section><div className="learning-shortcuts"><button onClick={()=>setView('vocab')}><Bookmark size={17}/> My vocabulary <span>{vocab.length} saved</span></button><button onClick={()=>setView('flashcards')}><GraduationCap size={17}/> Flashcard practice <span>Review saved words</span></button><button onClick={openGrammar}><Languages size={17}/> Grammar library <span>Rules and examples</span></button></div><p className="library-footnote">We link to original publishers. Content availability, reading levels and reuse permissions are determined by each source.</p>
       </section>
       <section className="how-section" id="how"><div className="how-heading"><div className="eyebrow">A SIMPLE WAY TO LEARN</div><h2>Make every word count.</h2></div><div className="how-grid"><div className="how-step"><span>01</span><BookOpen/><h3>Choose a source</h3><p>Find German reading from publishers and learning platforms.</p></div><div className="how-step"><span>02</span><Sparkles/><h3>Explore language</h3><p>Paste permitted text into the reader and tap a word for its meaning.</p></div><div className="how-step"><span>03</span><Bookmark/><h3>Keep progressing</h3><p>Save useful words, practise with flashcards and export your vocabulary.</p></div></div></section>
     </main>
