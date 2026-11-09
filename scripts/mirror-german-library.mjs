@@ -1,64 +1,45 @@
-import { execFileSync } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const root = process.cwd()
-const mirrorDir = join(root, '.gutenberg-mirror')
 const outputDir = join(root, 'public', 'books')
-const curated = [
-  { id: 35794, title: 'Märchen und Erzählungen für Anfänger · Erster Teil', author: 'H. A. Guerber', level: 'A1', sourceUrl: 'https://www.gutenberg.org/ebooks/35794' },
-  { id: 45189, title: 'Märchen und Erzählungen für Anfänger · Zweiter Teil', author: 'H. A. Guerber', level: 'A2', sourceUrl: 'https://www.gutenberg.org/ebooks/45189' },
-  { id: 74008, title: 'Der Schimmelreiter', author: 'Theodor Storm', level: 'B1', sourceUrl: 'https://www.gutenberg.org/ebooks/74008' },
-  { id: 22367, title: 'Die Verwandlung', author: 'Franz Kafka', level: 'B1', sourceUrl: 'https://www.gutenberg.org/ebooks/22367' },
-  { id: 6651, title: 'Immensee', author: 'Theodor Storm', level: 'B1', sourceUrl: 'https://www.gutenberg.org/ebooks/6651' },
-  { id: 25791, title: 'In der Strafkolonie', author: 'Franz Kafka', level: 'B1+', sourceUrl: 'https://www.gutenberg.org/ebooks/25791' },
-  { id: 69327, title: 'Der Prozess', author: 'Franz Kafka', level: 'B2', sourceUrl: 'https://www.gutenberg.org/ebooks/69327' }
-]
 const categories = [
   'Kategorie:Roman',
   'Kategorie:Novelle',
   'Kategorie:Erzählung',
   'Kategorie:Märchen',
   'Kategorie:Sage',
-  'Kategorie:Kriminalroman',
-  'Kategorie:Kinder- und Jugendliteratur'
+  'Kategorie:Fabel',
+  'Kategorie:Anekdote'
 ]
-const apiHeaders = { 'User-Agent': 'FluentioStories/1.0 (https://muneebinu.github.io/Fluentio-stories/)', 'Accept': 'application/json' }
+const apiHeaders = {
+  'User-Agent': 'FluentioStories/1.0 (https://muneebinu.github.io/Fluentio-stories/)',
+  'Accept': 'application/json'
+}
+const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
 
-function walk(dir) {
-  if (!existsSync(dir)) return []
-  return readdirSync(dir).flatMap(name => {
-    const path = join(dir, name)
-    return statSync(path).isDirectory() ? walk(path) : [path]
-  })
+function htmlToText(html) {
+  return String(html || '')
+    .replace(/<(script|style|noscript|nav|header|footer)[^>]*>[\\s\\S]*?<\\/\\1>/gi, ' ')
+    .replace(/<div[^>]+class="[^"]*(?:toc|navbox|references|catlinks|mw-editsection)[^"]*"[^>]*>[\\s\\S]*?<\\/div>/gi, ' ')
+    .replace(/<table[\\s\\S]*?<\\/table>/gi, ' ')
+    .replace(/<br\\s*\\/?\\s*>/gi, '\\n')
+    .replace(/<\\/(p|div|h[1-6]|li|blockquote|section)>/gi, '\\n\\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&#(\\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/[ \\t]+\\n/g, '\\n')
+    .replace(/\\n{3,}/g, '\\n\\n')
+    .trim()
 }
 
-async function mirrorCuratedGutenberg() {
-  mkdirSync(mirrorDir, { recursive: true })
-  const ids = curated.map(book => book.id)
-  const acceptRegex = '.*(' + ids.join('|') + ').*\\.txt$'
-  const harvestUrl = 'https://www.gutenberg.org/robot/harvest?filetypes%5B%5D=txt&langs%5B%5D=de'
-  try {
-    console.log('Requesting the seven curated reader files through Project Gutenberg’s documented robot-harvest route.')
-    execFileSync('wget', ['--wait=2', '--mirror', '--span-hosts', '--accept-regex=' + acceptRegex, '--directory-prefix=' + mirrorDir, harvestUrl], { stdio: 'inherit' })
-  } catch (error) {
-    console.warn('The Gutenberg mirror step did not complete; continuing with the Wikisource library.', error.message)
-  }
-  const files = walk(mirrorDir).filter(path => path.toLowerCase().endsWith('.txt'))
-  const output = []
-  for (const book of curated) {
-    const matches = files.filter(path => path.includes(String(book.id)))
-    if (!matches.length) continue
-    matches.sort((a, b) => statSync(b).size - statSync(a).size)
-    const destination = join(outputDir, book.id + '.txt')
-    copyFileSync(matches[0], destination)
-    const text = readFileSync(destination, 'utf8')
-    output.push({ ...book, provider: 'gutenberg', word_count: text.trim().split(/\s+/).length, subjects: ['learner reader', book.level] })
-  }
-  return output
-}
-
-async function fetchWikisourceCategory(category) {
+async function fetchCategoryMembers(category) {
   const params = new URLSearchParams({
     action: 'query',
     list: 'categorymembers',
@@ -69,89 +50,82 @@ async function fetchWikisourceCategory(category) {
     origin: '*'
   })
   const response = await fetch('https://de.wikisource.org/w/api.php?' + params.toString(), { headers: apiHeaders })
-  if (!response.ok) throw new Error('Wikisource category ' + category + ' returned ' + response.status)
+  if (!response.ok) throw new Error(category + ' category request returned ' + response.status)
   const data = await response.json()
-  if (data.error) throw new Error(data.error.info || 'Wikisource API error')
+  if (data.error) throw new Error(data.error.info || 'Wikisource category error')
   return data.query?.categorymembers || []
 }
 
-async function fetchWikisourceExtracts(titles) {
-  const params = new URLSearchParams({
-    action: 'query',
-    prop: 'extracts',
-    titles: titles.join('|'),
-    explaintext: '1',
-    exsectionformat: 'plain',
-    exlimit: '20',
-    format: 'json',
-    origin: '*'
-  })
+async function fetchFullText(title) {
+  const params = new URLSearchParams({ action: 'parse', page: title, prop: 'text', format: 'json', origin: '*' })
   const response = await fetch('https://de.wikisource.org/w/api.php?' + params.toString(), { headers: apiHeaders })
-  if (!response.ok) throw new Error('Wikisource text request returned ' + response.status)
+  if (!response.ok) return ''
   const data = await response.json()
-  if (data.error) throw new Error(data.error.info || 'Wikisource extract error')
-  return Object.values(data.query?.pages || {})
+  if (data.error) return ''
+  return htmlToText(data.parse?.text)
 }
 
 function levelForCategory(category) {
-  if (/Märchen|Sage|Fabel|Anekdote/.test(category)) return 'A2 challenge'
-  if (/Erzählung|Novelle/.test(category)) return 'B1 challenge'
-  if (/Roman|Kriminalroman/.test(category)) return 'B2 challenge'
+  if (/Fabel|Anekdote|Märchen|Sage/.test(category)) return 'A1–A2 reading challenge'
+  if (/Erzählung|Novelle/.test(category)) return 'B1 reading challenge'
+  if (/Roman/.test(category)) return 'B2 reading challenge'
   return 'Reading challenge'
 }
 
 async function mirrorWikisource() {
   const found = new Map()
   for (const category of categories) {
+    if (found.size >= 150) break
     try {
-      const members = await fetchWikisourceCategory(category)
+      const members = await fetchCategoryMembers(category)
       const titles = members.map(page => page.title).filter(title => title && !title.includes(':'))
-      console.log('Wikisource category ' + category + ': ' + titles.length + ' candidate works.')
-      for (let start = 0; start < titles.length && found.size < 150; start += 20) {
-        const batch = titles.slice(start, start + 20)
-        const pages = await fetchWikisourceExtracts(batch)
-        for (const page of pages) {
-          const title = page.title || ''
-          const text = (page.extract || '').trim()
-          if (!page.pageid || !title || text.length < 6000 || found.has(page.pageid)) continue
+      console.log('Wikisource ' + category + ': checking ' + titles.length + ' titles.')
+      for (let start = 0; start < titles.length && found.size < 150; start += 3) {
+        const batch = titles.slice(start, start + 3)
+        const texts = await Promise.all(batch.map(title => fetchFullText(title)))
+        for (let i = 0; i < batch.length; i++) {
+          const title = batch[i]
+          const text = texts[i]
+          if (!text || text.length < 6000) continue
+          const page = members.find(item => item.title === title)
+          if (!page?.pageid || found.has(page.pageid)) continue
           const id = 'ws-' + page.pageid
           const sourceUrl = 'https://de.wikisource.org/wiki/' + encodeURIComponent(title.replaceAll(' ', '_'))
-          const authorMatch = text.match(/(?:Autor|Verfasser)[:：]\s*([^\n]+)/i)
-          const authors = [{ name: authorMatch?.[1]?.trim() || 'Wikisource edition' }]
-          const wordCount = text.split(/\s+/).filter(Boolean).length
-          found.set(page.pageid, {
-            id, title, authors, subjects: [category.replace('Kategorie:', '')],
+          const wordCount = text.split(/\\s+/).filter(Boolean).length
+          const authorMatch = text.match(/(?:Autor|Verfasser)[:：]\\s*([^\\n]+)/i)
+          const book = {
+            id, title,
+            authors: [{ name: authorMatch?.[1]?.trim() || 'German Wikisource' }],
+            subjects: [category.replace('Kategorie:', '')],
             provider: 'wikisource', sourceUrl, word_count: wordCount,
             level: levelForCategory(category)
-          })
+          }
+          found.set(page.pageid, book)
           writeFileSync(join(outputDir, id + '.txt'), text, 'utf8')
         }
         if (found.size >= 150) break
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await pause(1000)
       }
-      if (found.size >= 150) break
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await pause(1000)
     } catch (error) {
-      console.warn('Skipping Wikisource category ' + category + ': ' + error.message)
+      console.warn('Skipping ' + category + ': ' + error.message)
     }
   }
-  console.log('Wikisource contributed ' + found.size + ' substantial full texts.')
+  console.log('Mirrored ' + found.size + ' complete German Wikisource texts.')
   return [...found.values()]
 }
 
 async function main() {
   mkdirSync(outputDir, { recursive: true })
-  const gutenbergBooks = await mirrorCuratedGutenberg()
-  const wikisourceBooks = await mirrorWikisource()
-  const books = [...gutenbergBooks, ...wikisourceBooks]
+  const books = await mirrorWikisource()
   const ids = books.map(book => book.id)
   writeFileSync(join(outputDir, 'index.json'), JSON.stringify({ ids, count: books.length, books }, null, 2))
   writeFileSync(join(outputDir, 'NOTICE.txt'),
-    'Fluentio Stories hosts selected full-text editions from Project Gutenberg and German Wikisource. ' +
-    'Project Gutenberg files are retained with their original licence headers. German Wikisource texts are attributed to their source pages; check each page for its specific public-domain or Creative Commons licence. ' +
-    'Copyright status can differ by country and translations may have separate rights.\\n'
+    'German-language full texts mirrored from German Wikisource for Fluentio Stories. ' +
+    'Each entry links to its source page. Check the individual source page for the specific public-domain or Creative Commons licence and attribution requirements. ' +
+    'The reading-level labels are approximate genre-based challenges, not official CEFR grading.\\n'
   )
-  console.log('Hosted ' + books.length + ' full-text German works (' + gutenbergBooks.length + ' Gutenberg learner/classic editions; ' + wikisourceBooks.length + ' Wikisource works).')
+  console.log('Hosted ' + books.length + ' complete German texts in the Fluentio library.')
   if (books.length < 5) throw new Error('Too few full texts were mirrored; refusing to publish an almost-empty library.')
 }
 
