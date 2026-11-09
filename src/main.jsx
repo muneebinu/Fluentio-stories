@@ -72,7 +72,7 @@ function App() {
     const current = practiceVocab[flashIndex % practiceVocab.length]
     const next = vocab.map(item => item.word === current.word ? {...item, interval: days, due: Date.now() + days*24*60*60*1000, reviews: (item.reviews || 0)+1} : item)
     persistVocab(next)
-    setFlashIndex((flashIndex+1) % practiceVocab.length)
+    setFlashIndex(0)
     setShowAnswer(false)
     setReviewed(reviewed+1)
   }
