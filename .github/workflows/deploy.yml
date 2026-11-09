@@ -27,6 +27,13 @@ jobs:
           node-version: 20
       - name: Install dependencies
         run: npm install
+      - name: Restore German book mirror cache
+        uses: actions/cache@v4
+        with:
+          path: .gutenberg-mirror
+          key: german-public-domain-books-v1
+      - name: Mirror selected German public-domain books
+        run: node scripts/mirror-german-library.mjs
       - name: Build
         run: npm run build
       - name: Upload Pages artifact
