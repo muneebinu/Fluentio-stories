@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ArrowLeft, ArrowUpRight, BookOpen, Bookmark, Check, ChevronDown, ExternalLink, Globe2, Search, Sparkles, X, Languages, Volume2, Download, Trash2, RotateCcw, GraduationCap } from 'lucide-react'
 import './styles.css'
 import './reader.css'
+import { originalStories } from './stories'
 
 const levels = ['All levels', 'A1', 'A2', 'B1', 'B2']
 
@@ -55,6 +56,52 @@ function App() {
   const [phraseSelected, setPhraseSelected] = useState('')
   const [readerFontSize, setReaderFontSize] = useState(17)
   const [isSpeaking, setIsSpeaking] = useState(false)
+  const [bookCatalog, setBookCatalog] = useState([])
+  const [bookCount, setBookCount] = useState(0)
+  const [bookNext, setBookNext] = useState(null)
+  const [bookSearch, setBookSearch] = useState('')
+  const [booksLoading, setBooksLoading] = useState(false)
+  const [booksError, setBooksError] = useState('')
+  const [bookLoadingId, setBookLoadingId] = useState(null)
+  const [lookupCache, setLookupCache] = useState(() => { try { return JSON.parse(localStorage.getItem('fluentio-lookup-cache') || '{}') } catch { return {} } })
+
+  async function loadBookCatalog(url = null, search = bookSearch, append = false) {
+    setBooksLoading(true); setBooksError('')
+    try {
+      const endpoint = url || (() => {
+        const params = new URLSearchParams({ languages: 'de', mime_type: 'text/', copyright: 'false' })
+        if (search.trim()) params.set('search', search.trim())
+        return 'https://gutendex.com/books/?' + params.toString()
+      })()
+      const response = await fetch(endpoint)
+      if (!response.ok) throw new Error('Catalogue returned ' + response.status)
+      const data = await response.json()
+      setBookCatalog(current => append ? [...current, ...(data.results || [])] : (data.results || []))
+      setBookCount(data.count || 0); setBookNext(data.next || null)
+    } catch {
+      setBooksError('The public-domain book catalogue is temporarily unavailable. Your built-in stories are still ready to read.')
+    } finally { setBooksLoading(false) }
+  }
+
+  useEffect(() => { loadBookCatalog(null, '', false) }, [])
+
+  async function openGutenbergBook(book) {
+    const formats = book.formats || {}
+    const textUrl = formats['text/plain; charset=utf-8'] || formats['text/plain; charset=us-ascii'] || Object.entries(formats).find(([type, url]) => type.startsWith('text/plain') && /\.txt(\.utf-8)?$/i.test(url))?.[1]
+    if (!textUrl) { setBooksError('This title does not currently provide a plain-text reader format.'); return }
+    setBookLoadingId(book.id); setBooksError('')
+    try {
+      const response = await fetch(textUrl)
+      if (!response.ok) throw new Error('Book text unavailable')
+      let text = (await response.text()).replace(/^\uFEFF/, '')
+      text = text.replace(/^[\s\S]*?\*\*\* START OF (?:THE|THIS) PROJECT GUTENBERG EBOOK[^\n]*\n/i, '')
+      text = text.replace(/\n\*\*\* END OF (?:THE|THIS) PROJECT GUTENBERG EBOOK[\s\S]*$/i, '')
+      if (text.length > 900000) text = text.slice(0, 900000) + '\n\n[Text shortened in the browser reader. Open the source edition for the complete book.]'
+      openReader(text.trim(), book.title)
+    } catch {
+      setBooksError('Could not load this book text from Project Gutenberg. Try another title or open its source edition.')
+    } finally { setBookLoadingId(null) }
+  }
 
   function persistVocab(next) { setVocab(next); localStorage.setItem('fluentio-vocab', JSON.stringify(next)) }
   function saveCurrentText() {
@@ -138,54 +185,62 @@ function App() {
   }
 
   async function lookupWord(value) {
-    const clean = value.trim().replace(/[^\\p{L}\\p{M}-]/gu, '')
+    const clean = value.trim().replace(/[^\p{L}\p{M}-]/gu, '')
     if (!clean) return
-    setActiveWord(clean); setTranslation(''); setDictionary(''); setLexical(null); setError(''); setLoading(true)
+    setActiveWord(clean); setError('')
+    const cached = lookupCache[clean.toLocaleLowerCase()]
+    if (cached) {
+      setTranslation(cached.translation || ''); setDictionary(cached.dictionary || '')
+      setLexical(cached.lexical || null); setLoading(false); return
+    }
+    setTranslation(''); setDictionary(''); setLexical(null); setLoading(true)
     try {
-      const wiktUrl = 'https://api.wiktapi.dev/v1/en/word/' + encodeURIComponent(clean) + '?lang=de'
-      const vocabUrl = 'https://german-language.onrender.com/vocab/search?q=' + encodeURIComponent(clean) + '&limit=8'
-      const translationUrl = new URL('https://api.mymemory.translated.net/get')
-      translationUrl.searchParams.set('q', clean); translationUrl.searchParams.set('langpair', 'de|en')
-      const results = await Promise.allSettled([fetch(wiktUrl), fetch(vocabUrl, {headers:{'X-API-Key':'demo-key-12345'}}), fetch(translationUrl)])
-      let wiktEntry = null, vocabEntry = null, translated = ''
-      if (results[0].status === 'fulfilled' && results[0].value.ok) {
-        const data = await results[0].value.json()
-        wiktEntry = (data.entries || []).find(entry => entry.lang_code === 'de' || entry.lang === 'German') || data.entries?.[0] || null
+      const googleUrl = new URL('https://translate.googleapis.com/translate_a/single')
+      googleUrl.searchParams.set('client', 'gtx'); googleUrl.searchParams.set('sl', 'de')
+      googleUrl.searchParams.set('tl', 'en'); googleUrl.searchParams.set('dt', 't'); googleUrl.searchParams.set('q', clean)
+      const memoryUrl = new URL('https://api.mymemory.translated.net/get')
+      memoryUrl.searchParams.set('q', clean); memoryUrl.searchParams.set('langpair', 'de|en')
+      const googleTranslation = async () => {
+        const r = await fetch(googleUrl, { signal: AbortSignal.timeout(7000) })
+        if (!r.ok) throw new Error('Google translation unavailable')
+        const d = await r.json()
+        const value = (d?.[0] || []).map(part => part?.[0] || '').join('').trim()
+        if (!value) throw new Error('Empty translation')
+        return value
       }
-      if (results[1].status === 'fulfilled' && results[1].value.ok) {
-        const data = await results[1].value.json()
-        const matches = data.data || []
-        vocabEntry = matches.find(entry => entry.german?.toLocaleLowerCase() === clean.toLocaleLowerCase()) || matches[0] || null
+      const memoryTranslation = async () => {
+        const r = await fetch(memoryUrl, { signal: AbortSignal.timeout(8000) })
+        if (!r.ok) throw new Error('MyMemory unavailable')
+        const d = await r.json()
+        const value = d?.responseData?.translatedText?.trim()
+        if (!value || d?.quotaFinished) throw new Error('No translation')
+        return value
       }
-      if (results[2].status === 'fulfilled' && results[2].value.ok) {
-        const data = await results[2].value.json()
-        if (data?.responseData?.translatedText) { translated = data.responseData.translatedText; setTranslation(translated) }
+      const dictionaryLookup = async () => {
+        const u = new URL('https://de.wiktionary.org/w/api.php')
+        u.searchParams.set('action','query'); u.searchParams.set('prop','extracts')
+        u.searchParams.set('explaintext','1'); u.searchParams.set('exsectionformat','plain')
+        u.searchParams.set('titles',clean); u.searchParams.set('format','json'); u.searchParams.set('origin','*')
+        const r = await fetch(u, { signal: AbortSignal.timeout(7000) })
+        if (!r.ok) throw new Error('Wiktionary unavailable')
+        const d = await r.json()
+        const page = Object.values(d?.query?.pages || {})[0]
+        return page?.extract || ''
       }
-      const senses = (wiktEntry?.senses || []).flatMap(sense => sense.glosses || []).slice(0,5)
-      const forms = (wiktEntry?.forms || []).slice(0,12).map(form => form.form).filter(Boolean)
-      const structured = {
-        lemma: wiktEntry?.word || vocabEntry?.german || clean,
-        pos: wiktEntry?.pos || vocabEntry?.pos || '',
-        gender: vocabEntry?.gender || (wiktEntry?.senses || []).flatMap(s => s.tags || []).find(tag => ['masculine','feminine','neuter'].includes(tag)) || '',
-        english: vocabEntry?.english || senses[0] || '',
-        definitions: senses,
-        forms,
-        example: vocabEntry?.example_de || '',
-        exampleEn: vocabEntry?.example_en || '',
-        level: vocabEntry?.level || ''
-      }
-      setLexical(structured)
-      if (vocabEntry?.english && !translated) { translated = vocabEntry.english; setTranslation(translated) }
-      if (senses.length || forms.length) setDictionary([...senses, ...(forms.length ? ['Forms: '+forms.join(', ')] : [])].join('\\n'))
-      else {
-        const dictionaryUrl = new URL('https://de.wiktionary.org/w/api.php')
-        dictionaryUrl.searchParams.set('action','query'); dictionaryUrl.searchParams.set('prop','extracts'); dictionaryUrl.searchParams.set('explaintext','1'); dictionaryUrl.searchParams.set('titles',structured.lemma); dictionaryUrl.searchParams.set('format','json'); dictionaryUrl.searchParams.set('origin','*')
-        const fallback = await fetch(dictionaryUrl)
-        if (fallback.ok) { const data = await fallback.json(); const page = Object.values(data?.query?.pages || {})[0]; if (page?.extract) setDictionary(page.extract.slice(0,1000)) }
-      }
-      if (!vocabEntry && !wiktEntry && !translation) setError('No dictionary result was found. Try the base form of the word.')
-    } catch (e) { setError('Dictionary services are temporarily unavailable. Try again in a moment.') }
-    finally { setLoading(false) }
+      const [translationResult, dictionaryResult] = await Promise.allSettled([
+        Promise.any([googleTranslation(), memoryTranslation()]), dictionaryLookup()
+      ])
+      const translated = translationResult.status === 'fulfilled' ? translationResult.value : ''
+      const dictionaryText = dictionaryResult.status === 'fulfilled' ? dictionaryResult.value.slice(0,1800) : ''
+      const lexicalData = { lemma: clean, english: translated, pos: '', gender: '', definitions: [], forms: [], example: '', exampleEn: '', level: '' }
+      setTranslation(translated); setDictionary(dictionaryText); setLexical(lexicalData)
+      if (!translated && !dictionaryText) setError('No result was returned. Try the dictionary base form or try again shortly.')
+      const nextCache = { ...lookupCache, [clean.toLocaleLowerCase()]: { translation: translated, dictionary: dictionaryText, lexical: lexicalData } }
+      setLookupCache(nextCache)
+      try { localStorage.setItem('fluentio-lookup-cache', JSON.stringify(nextCache)) } catch {}
+    } catch {
+      setError('Translation services are temporarily unavailable. Please try again.')
+    } finally { setLoading(false) }
   }
 
   function openReader(text = '', title = '') {
@@ -231,7 +286,7 @@ function App() {
   function renderReadableText() {
     const tokens = readerText.split(/([\p{L}\p{M}]+(?:[-’'][\p{L}\p{M}]+)*)/gu)
     return tokens.map((token, index) => /^[\p{L}\p{M}]+(?:[-’'][\p{L}\p{M}]+)*$/u.test(token)
-      ? <button className={'reader-word' + (activeWord.toLocaleLowerCase() === token.toLocaleLowerCase() ? ' word-active' : '')} key={index} onClick={() => lookupWord(token)}>{token}</button>
+      ? <button className={'reader-word' + (activeWord.toLocaleLowerCase() === token.toLocaleLowerCase() ? ' word-active' : '')} key={index} onClick={() => lookupWord(token)} onMouseEnter={() => lookupWord(token)}>{token}</button>
       : <React.Fragment key={index}>{token}</React.Fragment>)
   }
 
@@ -252,10 +307,12 @@ function App() {
     <main className="reader-layout">
       <section className="reader-main">
         <div className="reader-kicker">YOUR READING SPACE <span>·</span> GERMAN</div>
-        <input className="reader-title-input" value={readerTitle} onChange={e=>setReaderTitle(e.target.value)} placeholder="Give your reading a title..." aria-label="Reading title"/>
-        <p className="reader-instructions">Paste text from a source you are permitted to use, then tap any German word to explore it.</p>
-        <textarea className="reader-paste" value={readerText} onChange={e=>setReaderText(e.target.value)} placeholder="Paste your German text here…" aria-label="German reading text"/>
-        <div className="reader-toolbar"><span>{readerText.trim() ? readerText.trim().split(/\s+/).length + ' words' : 'Your text stays in this browser session.'}</span><div className="reader-toolbar-actions"><button onClick={speakPassage}>Listen to text</button><button onClick={stopPassage} disabled={!isSpeaking}>Stop audio</button><button onClick={saveCurrentText}>Save reading</button><label className="upload-text-button">Upload .txt<input type="file" accept=".txt,text/plain" onChange={e=>loadTextFile(e.target.files?.[0])}/></label><button onClick={()=>{setReaderText('');setReaderTitle('');setActiveWord('')}}>Clear text</button></div></div>
+        <details className="reader-import"><summary>Import your own text (optional)</summary>
+          <input className="reader-title-input" value={readerTitle} onChange={e=>setReaderTitle(e.target.value)} placeholder="Give your reading a title..." aria-label="Reading title"/>
+          <p className="reader-instructions">Paste text you are permitted to use, or upload a plain-text file.</p>
+          <textarea className="reader-paste" value={readerText} onChange={e=>setReaderText(e.target.value)} placeholder="Paste your German text here…" aria-label="German reading text"/>
+          <div className="reader-toolbar"><span>{readerText.trim() ? readerText.trim().split(/\s+/).length + ' words' : 'Your text stays in this browser session.'}</span><div className="reader-toolbar-actions"><button onClick={speakPassage}>Listen to text</button><button onClick={stopPassage} disabled={!isSpeaking}>Stop audio</button><button onClick={saveCurrentText}>Save reading</button><label className="upload-text-button">Upload .txt<input type="file" accept=".txt,text/plain" onChange={e=>loadTextFile(e.target.files?.[0])}/></label><button onClick={()=>{setReaderText('');setReaderTitle('');setActiveWord('')}}>Clear text</button></div></div>
+        </details>
         {error&&<p className="reader-feedback">{error}</p>}<div className="reader-divider"/>
         <div className="reading-heading"><span className="eyebrow">INTERACTIVE READING</span><span className="reading-hint"><span className="hint-dot"/> Tap a word to look it up</span><div className="reading-tools"><button onClick={()=>setReaderFontSize(Math.max(14,readerFontSize-1))} aria-label="Decrease text size">A−</button><button onClick={()=>setReaderFontSize(Math.min(28,readerFontSize+1))} aria-label="Increase text size">A+</button>{phraseSelected&&<button className="phrase-lookup" onClick={()=>lookupPhrase(phraseSelected)}>Translate selected phrase</button>}</div></div>
         {readerText.trim()
@@ -290,20 +347,31 @@ function App() {
           <h1>Read more.<br/><em>Understand</em> more.</h1>
           <p className="hero-description">A better way to build your German — discover reading from A1 to B2, explore real-world language, and grow your vocabulary as you go.</p>
           <button className="hero-button" onClick={()=>document.getElementById('library')?.scrollIntoView({behavior:'smooth'})}>Explore the library <ArrowUpRight size={17}/></button>
-          <div className="hero-meta"><span><BookOpen size={15}/> Curated reading sources</span><span><Globe2 size={15}/> A1 — B2</span></div>
+          <div className="hero-meta"><span><BookOpen size={15}/> In-app stories + public-domain books</span><span><Globe2 size={15}/> A1 — B2</span></div>
         </div>
         <div className="hero-art" aria-label="Editorial illustration of a reading book"><div className="art-note note-top">LESEN · LERNEN · WACHSEN</div><div className="book-shadow"/><div className="book"><div className="book-label">DEUTSCH<br/>ENTDECKEN</div><div className="book-rule"/><div className="book-lines"><i/><i/><i/><i/></div><div className="book-mark">01 / 04</div></div><div className="art-stamp">WORT<br/>FÜR WORT</div><div className="art-note note-bottom">YOUR NEXT CHAPTER STARTS HERE.</div></div>
       </section>
       <section className="level-strip" aria-label="Reading levels"><div><span className="strip-label">FIND YOUR LEVEL</span><strong>Start where you are.</strong></div><div className="level-pills">{levels.slice(1).map(l=><button key={l} onClick={()=>{setLevel(l);document.getElementById('library')?.scrollIntoView({behavior:'smooth'})}} className={level===l?'active':''}>{l}</button>)}</div></section>
       <section className="library-section" id="library">
-        <div className="section-heading"><div><div className="eyebrow">THE READING ROOM</div><h2>Find your next read.</h2><p>Explore trusted places to read German at your pace.</p></div><div className="search-wrap"><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search reading sources..." aria-label="Search reading sources"/></div></div>
+        <div className="section-heading"><div><div className="eyebrow">THE READING ROOM</div><h2>Find your next read.</h2><p>Browse stories and books you can read right here, plus trusted external learning sources.</p></div><div className="search-wrap"><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search reading sources..." aria-label="Search reading sources"/></div></div>
         <div className="filters">{levels.map(l=><button key={l} className={level===l?'selected':''} onClick={()=>setLevel(l)}>{l}</button>)}<span className="result-count">{filtered.length} SOURCES</span></div>
+        <section className="in-app-library">
+          <div className="in-app-library-heading"><div><span className="eyebrow">READ WITHOUT LEAVING FLUENTIO</span><h3>Stories ready to open.</h3><p>Original short stories for A1, A2, B1 and B2. Tap any story and start reading immediately.</p></div><span className="library-count">{originalStories.length} ORIGINAL STORIES</span></div>
+          <div className="story-grid">{originalStories.filter(story=>level==='All levels'||story.level===level).map(story=><article className="story-card" key={story.id}><span className="story-level">{story.level} · {story.topic}</span><h4>{story.title}</h4><p>{story.description}</p><button onClick={()=>openReader(story.text,story.title)}>Read story <ArrowUpRight size={15}/></button></article>)}</div>
+          {originalStories.filter(story=>level==='All levels'||story.level===level).length===0&&<p className="panel-muted">No original story at this level yet.</p>}
+          <div className="catalog-heading"><div><span className="eyebrow">THE CLASSICS COLLECTION</span><h3>German books from Project Gutenberg.</h3><p>Search a large public-domain catalogue. Full text opens here when a plain-text edition is available.</p></div><div className="catalog-search"><input value={bookSearch} onChange={e=>setBookSearch(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')loadBookCatalog(null,bookSearch,false)}} placeholder="Search German books or authors..."/><button onClick={()=>loadBookCatalog(null,bookSearch,false)}><Search size={15}/></button></div></div>
+          <div className="catalog-meta"><span>{bookCount.toLocaleString()} German public-domain catalogue results</span><span>Page size: up to 32 books</span></div>
+          {booksError&&<p className="reader-feedback">{booksError}</p>}
+          {booksLoading&&!bookCatalog.length?<p className="panel-muted">Loading German books…</p>:<div className="book-grid">{bookCatalog.map(book=><article className="catalog-book" key={book.id}><span className="book-level">PROJECT GUTENBERG · {(book.languages||[]).join(', ').toUpperCase()}</span><h4>{book.title}</h4><p>{(book.authors||[]).map(a=>a.name).join(', ')||'Unknown author'}</p><small>{(book.download_count||0).toLocaleString()} downloads</small><button disabled={bookLoadingId===book.id} onClick={()=>openGutenbergBook(book)}>{bookLoadingId===book.id?'Opening…':'Read inside Fluentio'} <ArrowUpRight size={14}/></button></article>)}</div>}
+          {bookNext&&<button className="catalog-more" disabled={booksLoading} onClick={()=>loadBookCatalog(bookNext,bookSearch,true)}>{booksLoading?'Loading…':'Load more German books'}</button>}
+          <p className="catalog-note">Catalogue and book text are supplied by Project Gutenberg/Gutendex. Availability and public-domain status can vary by country; check the book's source page before reuse or redistribution.</p>
+        </section>
         <div className="source-grid">{filtered.map((item,index)=><article className="source-card" key={item.id}><div className={'card-visual visual-'+item.id}><span className="visual-index">0{index+1}</span><span className="visual-type">{item.type}</span><div className="visual-glyph">{item.id===1?'A':item.id===2?'N':item.id===3?'Ü':'S'}</div></div><div className="card-content"><div className="card-topline"><span className="level-tag">{item.levelLabel}</span><span className="card-language">{item.language}</span></div><h3>{item.title}</h3><p>{item.description}</p><div className="card-footer"><span>{item.tag}</span><button onClick={()=>setSelected(item)} aria-label={'View '+item.title}><ArrowUpRight size={18}/></button></div></div></article>)}</div>
         {filtered.length===0&&<div className="empty-state">No sources match that search. Try another word or level.</div>}
         <div className="library-actions"><div><strong>Already have a German text?</strong><span>Open the interactive reader and explore it word by word.</span></div><button onClick={()=>openReader()}>Open reading workspace <ArrowUpRight size={16}/></button></div>
         <section className="featured-reading"><div className="eyebrow">HAND-PICKED STARTING POINTS</div><h3>Start with a real text.</h3><div className="featured-read-grid">{featuredReads.map(item=><article key={item.title}><span>{item.level} · {item.topic}</span><strong>{item.title}</strong><a href={item.url} target="_blank" rel="noreferrer">Read at German.net <ExternalLink size={13}/></a></article>)}</div><p>These are links to the original publisher. Their texts are not copied into Fluentio Stories.</p></section><div className="learning-shortcuts"><button onClick={()=>setView('texts')}><BookOpen size={17}/> Saved readings <span>{savedTexts.length} on this device</span></button><button onClick={()=>setView('vocab')}><Bookmark size={17}/> My vocabulary <span>{vocab.length} saved</span></button><button onClick={()=>setView('flashcards')}><GraduationCap size={17}/> Flashcard practice <span>Review saved words</span></button><button onClick={openGrammar}><Languages size={17}/> Grammar library <span>Rules and examples</span></button></div><p className="library-footnote">We link to original publishers. Content availability, reading levels and reuse permissions are determined by each source.</p>
       </section>
-      <section className="how-section" id="how"><div className="how-heading"><div className="eyebrow">A SIMPLE WAY TO LEARN</div><h2>Make every word count.</h2></div><div className="how-grid"><div className="how-step"><span>01</span><BookOpen/><h3>Choose a source</h3><p>Find German reading from publishers and learning platforms.</p></div><div className="how-step"><span>02</span><Sparkles/><h3>Explore language</h3><p>Paste permitted text into the reader and tap a word for its meaning.</p></div><div className="how-step"><span>03</span><Bookmark/><h3>Keep progressing</h3><p>Save useful words, practise with flashcards and export your vocabulary.</p></div></div></section>
+      <section className="how-section" id="how"><div className="how-heading"><div className="eyebrow">A SIMPLE WAY TO LEARN</div><h2>Make every word count.</h2></div><div className="how-grid"><div className="how-step"><span>01</span><BookOpen/><h3>Choose a story or book</h3><p>Open original stories and public-domain books right inside Fluentio.</p></div><div className="how-step"><span>02</span><Sparkles/><h3>Explore language</h3><p>Hover over or tap a word to see its English meaning.</p></div><div className="how-step"><span>03</span><Bookmark/><h3>Keep progressing</h3><p>Save useful words, practise with flashcards and export your vocabulary.</p></div></div></section>
     </main>
     <footer><a className="footer-brand" href="#home">FLUENTIO <span>STORIES</span></a><p>Read your way to German.</p><span>© {new Date().getFullYear()} Fluentio Academia</span></footer>
     {selected&&<div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setSelected(null)}}><section className="source-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><button className="modal-close" onClick={()=>setSelected(null)} aria-label="Close"><X size={19}/></button><span className="eyebrow">READING SOURCE · {selected.levelLabel}</span><h2 id="modal-title">{selected.title}</h2><p>{selected.description}</p><div className="modal-note">{selected.note}</div><a className="hero-button" href={selected.url} target="_blank" rel="noreferrer">Visit original source <ExternalLink size={16}/></a><div className="modal-divider"/><button className="reader-open-link" onClick={()=>openReader('',selected.title+' reading')}>Open reader workspace <ArrowUpRight size={15}/></button><p className="modal-small">Read the original publisher's material on its website. Paste text into your reading workspace only where you have permission to do so.</p></section></div>}
