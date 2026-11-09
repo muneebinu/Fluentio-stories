@@ -21,6 +21,16 @@ const sources = [
 
 ]
 
+const featuredReaderMeta = [
+  { id: 35794, level: 'A1', length: '163-page beginner reader', title: 'Märchen und Erzählungen für Anfänger · Teil 1', note: 'A historical German learner reader written for beginners, with deliberately repeated vocabulary, stories, questions and vocabulary.' },
+  { id: 45189, level: 'A2', length: '202-page continuation', title: 'Märchen und Erzählungen für Anfänger · Teil 2', note: 'The second volume continues the graded reader with longer tales, vocabulary and exercises.' },
+  { id: 74008, level: 'B1', length: 'Complete novella', title: 'Der Schimmelreiter', note: 'Theodor Storm’s full German novella. A substantial literary reading challenge.' },
+  { id: 22367, level: 'B1', length: 'Complete novella', title: 'Die Verwandlung', note: 'Franz Kafka’s complete original German novella.' },
+  { id: 6651, level: 'B1', length: 'Complete novella', title: 'Immensee', note: 'Theodor Storm’s complete German novella; a useful sustained-reading challenge.' },
+  { id: 25791, level: 'B1+', length: 'Complete long story', title: 'In der Strafkolonie', note: 'Franz Kafka’s complete German story. Mature themes; recommended for confident readers.' },
+  { id: 69327, level: 'B2', length: 'Complete novel', title: 'Der Prozess', note: 'Franz Kafka’s complete German-language novel.' }
+]
+
 const starterText = 'Fügen Sie hier einen deutschen Text ein, den Sie lesen möchten. Wählen Sie anschließend ein Wort aus, um seine Bedeutung nachzuschlagen.'
 
 function App() {
@@ -50,6 +60,8 @@ function App() {
   const [readerFontSize, setReaderFontSize] = useState(17)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [bookCatalog, setBookCatalog] = useState([])
+  const [featuredBooks, setFeaturedBooks] = useState([])
+  const [featuredBooksLoading, setFeaturedBooksLoading] = useState(true)
   const [bookCount, setBookCount] = useState(0)
   const [bookNext, setBookNext] = useState(null)
   const [bookSearch, setBookSearch] = useState('')
@@ -96,6 +108,14 @@ function App() {
   }
 
   useEffect(() => { loadBookCatalog(null, 'all', false, '', 'gutenberg') }, [])
+
+  useEffect(() => {
+    fetch('https://gutendex.com/books/?ids=' + featuredReaderMeta.map(book=>book.id).join(','))
+      .then(response=>{if(!response.ok) throw new Error('Could not load featured readers'); return response.json()})
+      .then(data=>setFeaturedBooks(data.results || []))
+      .catch(()=>setFeaturedBooks([]))
+      .finally(()=>setFeaturedBooksLoading(false))
+  }, [])
 
   async function openGutenbergBook(book) {
     const formats = book.formats || {}
@@ -413,7 +433,11 @@ function App() {
         <div className="filters">{levels.map(l=><button key={l} className={level===l?'selected':''} onClick={()=>setLevel(l)}>{l}</button>)}<span className="result-count">{filtered.length} SOURCES</span></div>
         <section className="in-app-library">
                     <div className="in-app-library-heading"><div><span className="eyebrow">FLUENTIO LONG-FORM LIBRARY</span><h3>Complete German books. Read them here.</h3><p>Search full-length German novels, novellas, fairy tales and short stories. Open the available text directly in the Fluentio reader and look up words as you go.</p></div><span className="library-count">{bookCount ? bookCount.toLocaleString() + " MATCHING BOOKS" : "LIVE BOOK CATALOGUE"}</span></div>
-                    <div className="library-provider-tabs"><button className={bookProvider==='gutenberg'?'active':''} onClick={()=>{setBookProvider('gutenberg');setBookCategory('all');setBookSearch('');loadBookCatalog(null,'all',false,'','gutenberg')}}>Full books · Project Gutenberg</button><button className={bookProvider==='wikisource'?'active':''} onClick={()=>{setBookProvider('wikisource');setBookCategory('Kategorie:Roman');setBookSearch('');loadBookCatalog(null,'Kategorie:Roman',false,'','wikisource')}}>German Wikisource</button></div>
+                    <div className="featured-reader-shelf">
+            <div className="featured-reader-heading"><div><span className="eyebrow">CURATED STARTING SHELF</span><h3>Real books for A1, A2 and B1.</h3><p>These are complete source texts, not five-line samples. The first two are historic learner readers; B1 titles are original German literature and are harder than modern graded readers.</p></div><span className="library-count">7 COMPLETE WORKS</span></div>
+            {featuredBooksLoading?<p className="panel-muted">Loading the curated books…</p>:<div className="featured-reader-grid">{featuredReaderMeta.map(meta=>{const book=featuredBooks.find(item=>item.id===meta.id);return <article className="featured-reader-card" key={meta.id}><div className="featured-reader-topline"><span>{meta.level}</span><small>{meta.length}</small></div><h4>{meta.title}</h4><p>{meta.note}</p><div className="featured-reader-actions"><button disabled={!book||bookLoadingId===meta.id} onClick={()=>book&&openGutenbergBook(book)}>{bookLoadingId===meta.id?'Opening…':'Read full book'} <ArrowUpRight size={14}/></button><a href={'https://www.gutenberg.org/ebooks/'+meta.id} target="_blank" rel="noreferrer">Source</a></div></article>})}</div>}
+          </div>
+          <div className="library-provider-tabs"><button className={bookProvider==='gutenberg'?'active':''} onClick={()=>{setBookProvider('gutenberg');setBookCategory('all');setBookSearch('');loadBookCatalog(null,'all',false,'','gutenberg')}}>Full books · Project Gutenberg</button><button className={bookProvider==='wikisource'?'active':''} onClick={()=>{setBookProvider('wikisource');setBookCategory('Kategorie:Roman');setBookSearch('');loadBookCatalog(null,'Kategorie:Roman',false,'','wikisource')}}>German Wikisource</button></div>
                     <div className="catalog-heading"><div><span className="eyebrow">{bookProvider==='gutenberg'?'PUBLIC-DOMAIN FULL TEXTS':'GERMAN SOURCE LIBRARY'}</span><h3>{bookProvider==='gutenberg'?'Novels and complete works.':'Original German literature.'}</h3><p>{bookProvider==='gutenberg'?'Search the German-language Project Gutenberg catalogue. Only entries marked public domain in the US and with older author dates are requested; check individual rights notices before reuse.':'Browse German Wikisource pages. Some entries are fragments or tables of contents, so Fluentio now checks for substantial text before opening them.'}</p></div><div className="catalog-search"><input value={bookSearch} onChange={e=>setBookSearch(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')loadBookCatalog(null,bookCategory,false,bookSearch,bookProvider)}} placeholder="Search book titles or authors..."/><button onClick={()=>loadBookCatalog(null,bookCategory,false,bookSearch,bookProvider)}><Search size={15}/></button></div></div>
                     <div className="catalog-controls"><select value={bookCategory} onChange={e=>{setBookCategory(e.target.value);loadBookCatalog(null,e.target.value,false,bookSearch,bookProvider)}}>{bookProvider==='gutenberg'?<><option value="all">All German full texts</option><option value="novels">Novels</option><option value="short stories">Short stories</option><option value="fairy tales">Fairy tales</option><option value="fiction">Fiction</option><option value="drama">Drama</option></>:<><option value="Kategorie:Roman">Novels (Romane)</option><option value="Kategorie:Novelle">Novellas (Novellen)</option><option value="Kategorie:Erzählung">Short stories (Erzählungen)</option><option value="Kategorie:Märchen">Fairy tales (Märchen)</option><option value="Kategorie:Sage">Legends (Sagen)</option><option value="Kategorie:Anekdote">Anecdotes (Anekdoten)</option></>}</select><span>{bookCount.toLocaleString()} catalogue matches · 32 books per Gutenberg page</span></div>
                     {booksError&&<p className="reader-feedback">{booksError}</p>}
