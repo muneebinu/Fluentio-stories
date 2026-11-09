@@ -76,7 +76,7 @@ function App() {
       const data = await response.json()
       const results = search.trim() ? (data.query?.search || []) : (data.query?.categorymembers || [])
       setBookCatalog(current => append ? [...current, ...results] : results)
-      setBookCount(data.query?.searchinfo?.totalhits || results.length)
+      setBookCount(data.query?.searchinfo?.totalhits ?? (append ? bookCatalog.length + results.length : results.length))
       if (data.continue) {
         const params = new URLSearchParams(endpoint.split('?')[1] || '')
         Object.entries(data.continue).forEach(([key,value])=>params.set(key,String(value)))
