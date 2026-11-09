@@ -4,20 +4,21 @@ A German reading and vocabulary workspace for learners from A1 to B2, built with
 
 ## Long-form reading library
 
-- Curated beginner shelf:
+- The deployment build mirrors a curated collection of German plain-text editions into the site's own `public/books` directory. The app reads those local files, so a book marked **Read inside Fluentio** does not depend on a live third-party file download.
+- The mirror script uses Project Gutenberg's documented robot-harvest route, with a two-second request delay, and selects older German-language works. Each mirrored text is retained with its source header and licence notice; the in-app reader shows the text cleanly and links to the original ebook landing page.
+- The curated beginner shelf includes:
   - A1: *Märchen und Erzählungen für Anfänger, Erster Teil* (Gutenberg #35794), a historic learner reader of about 163 printed pages.
   - A2: *Märchen und Erzählungen für Anfänger, Zweiter Teil* (Gutenberg #45189), the 202-page continuation reader.
   - B1 reading challenges: *Der Schimmelreiter*, *Die Verwandlung*, *Immensee* and *In der Strafkolonie*.
   - B2: *Der Prozess*.
-- The catalogue also connects to the searchable German Project Gutenberg collection and German Wikisource. Users can search titles/authors, browse by genre, and paginate through full-text entries.
-- The catalogue loads one book only when a reader opens it. It does not try to bulk-download thousands of books or mirror another publisher's PDF directory.
-- Book cards link to their original editions. The reader checks for a substantial text before opening a Wikisource entry, so short fragments and empty pages are rejected.
+- The deployment script also selects additional German-language works by older German-language authors, up to 160 titles. The actual hosted count is written to `public/books/index.json` and shown in the UI; it is not a hard-coded promise.
+- A separate searchable German Wikisource catalogue is available for additional works. Some entries are fragments or contents pages; Fluentio rejects entries without substantial readable text.
 - The B1/B2 labels on classic literature are practical reading estimates, not official publisher CEFR classifications. Original literature is not automatically beginner-friendly.
 - The InfoBooks German PDF collection is linked as a discovery source. A free download does not automatically grant Fluentio permission to rehost that PDF; check each title's rights and licence before copying or redistributing it.
 
 ## Reader and vocabulary
 
-- Open full texts inside Fluentio without pasting anything.
+- Open locally hosted full texts inside Fluentio without pasting anything.
 - Hover over or click words in a passage to request an English meaning and German dictionary information.
 - Translation tries a browser-accessible Google translation endpoint first and MyMemory as a fallback. The Google endpoint is unofficial and may change; MyMemory has provider usage limits.
 - German Wiktionary's MediaWiki API supplies dictionary extracts where available.
@@ -29,16 +30,18 @@ A German reading and vocabulary workspace for learners from A1 to B2, built with
 
 ## Content, licensing and attribution
 
-The two Guerber learner readers are historical works published in the 1890s. Project Gutenberg lists them as public domain in the United States. Project Gutenberg explicitly notes that its copyright determinations are US-based; users outside the US should check local law. The other selected classics are original German works by authors who died before 1955; individual ebook notices and local law still need to be checked, especially for translations and later editions.
+The two Guerber learner readers are historical works published in the 1890s. Project Gutenberg lists them as public domain in the United States. Project Gutenberg explicitly notes that its copyright determinations are US-based; users outside the US should check local law. The other selected classics are original German works by authors who died before 1955; individual ebook notices and local law still need to be checked.
 
-Fluentio loads texts from their original source at reading time and links back to the source edition. Do not assume that a free PDF on a third-party site can be republished by Fluentio. The InfoBooks page says its titles are shared under different legal bases (public domain, Creative Commons, or rights-holder permission); verify the specific title's licence and scope before rehosting it.
+Project Gutenberg asks automated clients to use its robot-harvest route and its recommended delay. The build script follows that route, mirrors only selected German text editions, retains their source licence notices, and links each title to its original ebook landing page. Some translations can have separate copyright; check each work before reuse or redistribution.
+
+External publisher materials are linked, not copied into Fluentio Stories.
 
 ## Data and technical limitations
 
 - Saved vocabulary and readings are stored in browser `localStorage`; they are not synced between devices.
 - Dictionary and translation services are third-party services. Their availability, rate limits, CORS policies and responses can change. Translations are aids, not guaranteed linguistic judgments.
+- The locally hosted book count depends on the books available through the source catalogue and the deployment mirror step.
 - Not every Wikisource entry has a complete transcription; Fluentio rejects short entries, but the source may still fail or be incomplete.
-- Project Gutenberg/Gutendex is a community-maintained catalogue with no production uptime guarantee. Text retrieval depends on the source being reachable and permitting browser access.
 - The app has no backend, user accounts, shared vocabulary sync, or server-side translation cache.
 - The flashcard scheduler is a lightweight interval system, not a validated SM-2 implementation.
 
@@ -54,4 +57,4 @@ npm run dev
 npm run build
 ```
 
-GitHub Pages deployment is configured through GitHub Actions.
+GitHub Pages deployment is configured through GitHub Actions. The deployment workflow runs `scripts/mirror-german-library.mjs` before building.
