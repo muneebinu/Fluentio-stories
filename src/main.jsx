@@ -123,7 +123,7 @@ function App() {
       const translationUrl = new URL('https://api.mymemory.translated.net/get')
       translationUrl.searchParams.set('q', clean); translationUrl.searchParams.set('langpair', 'de|en')
       const results = await Promise.allSettled([fetch(wiktUrl), fetch(vocabUrl, {headers:{'X-API-Key':'demo-key-12345'}}), fetch(translationUrl)])
-      let wiktEntry = null, vocabEntry = null
+      let wiktEntry = null, vocabEntry = null, translated = ''
       if (results[0].status === 'fulfilled' && results[0].value.ok) {
         const data = await results[0].value.json()
         wiktEntry = (data.entries || []).find(entry => entry.lang_code === 'de' || entry.lang === 'German') || data.entries?.[0] || null
@@ -135,7 +135,7 @@ function App() {
       }
       if (results[2].status === 'fulfilled' && results[2].value.ok) {
         const data = await results[2].value.json()
-        if (data?.responseData?.translatedText) setTranslation(data.responseData.translatedText)
+        if (data?.responseData?.translatedText) { translated = data.responseData.translatedText; setTranslation(translated) }
       }
       const senses = (wiktEntry?.senses || []).flatMap(sense => sense.glosses || []).slice(0,5)
       const forms = (wiktEntry?.forms || []).slice(0,12).map(form => form.form).filter(Boolean)
@@ -151,7 +151,7 @@ function App() {
         level: vocabEntry?.level || ''
       }
       setLexical(structured)
-      if (vocabEntry?.english && !translation) setTranslation(vocabEntry.english)
+      if (vocabEntry?.english && !translated) { translated = vocabEntry.english; setTranslation(translated) }
       if (senses.length || forms.length) setDictionary([...senses, ...(forms.length ? ['Forms: '+forms.join(', ')] : [])].join('\\n'))
       else {
         const dictionaryUrl = new URL('https://de.wiktionary.org/w/api.php')
@@ -253,7 +253,7 @@ function App() {
   return <div className="app-shell">
     <header className="topbar">
       <a className="brand" href="#home" aria-label="Fluentio Stories home"><img src="https://raw.githubusercontent.com/muneebinu/Fluentio-Academia/main/assets/logo.png" alt="Fluentio Academia"/><span className="brand-divider"/><span className="brand-name">STORIES</span></a>
-      <nav className="nav-links"><a href="#library">Explore</a><a href="#how">How it works</a><button onClick={()=>openReader()}>Reader</button><button onClick={()=>setView('vocab')}>Vocabulary</button><button onClick={openGrammar}>Grammar</button></nav>
+      <nav className="nav-links"><a href="#library">Explore</a><a href="#how">How it works</a><button onClick={()=>openReader()}>Reader</button><button onClick={()=>setView('vocab')}>Vocabulary</button><button onClick={openGrammar}>Grammar</button><a href="https://github.com/muneebinu/Fluentio-stories/tree/main/browser-extension" target="_blank" rel="noreferrer">Web Reader</a></nav>
       <button className="top-cta" onClick={()=>openReader()}>Open reader <ArrowUpRight size={16}/></button>
     </header>
     <main id="home">
