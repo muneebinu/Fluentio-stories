@@ -150,10 +150,23 @@ function App() {
         const html = typeof parseHtml === 'string' ? parseHtml : (parseHtml?.['*'] || '')
         if (html) {
           const doc = new DOMParser().parseFromString(html, 'text/html')
-          doc.querySelectorAll('script,style,nav,header,footer,button,.mw-editsection,.references,.reflist,.navbox,.catlinks,.toc,.ws-noexport,.printfooter,.authority-control,.metadata').forEach(node => node.remove())
+          doc.querySelectorAll('script,style,nav,header,footer,button,.mw-editsection,.references,.reflist,.navbox,.catlinks,.toc,.ws-noexport,.printfooter,.authority-control,.metadata,.ws-header,.ws-footer,.pagenum,.page-number,.ws-pagenum,.mw-indicators,.header,.footer').forEach(node => node.remove())
           const content = doc.querySelector('.mw-parser-output') || doc.querySelector('#mw-content-text') || doc.body
-          const rendered = (content?.innerText || content?.textContent || '').replace(/\\u00a0/g, ' ').replace(/\\n{3,}/g, '\\n\\n').trim()
-          // Prefer rendered transclusion text if it is longer than the extract.
+          // Extract prose blocks separately: scanned-page headers, page numbers
+          // and line breaks should not be merged into the story.
+          const blocks = [...content.querySelectorAll('h2,h3,h4,p,blockquote,li')]
+            .map(node => (node.innerText || node.textContent || '').replace(/\\u00a0/g, ' ').replace(/\\s+/g, ' ').trim())
+            .filter(value => value.length > 35 && !/^\\[?\\d{1,4}\\]?$/.test(value))
+          let rendered = blocks.join('\\n\\n')
+          if (rendered.length < 400) {
+            rendered = (content?.innerText || content?.textContent || '')
+              .replace(/\\u00a0/g, ' ')
+              .split('\\n')
+              .map(line => line.trim())
+              .filter(line => line && !/^\\d{1,4}$/.test(line))
+              .join(' ')
+              .replace(/\\s+/g, ' ')
+          }
           if (rendered.length > text.length) text = rendered
         }
       }
@@ -366,10 +379,13 @@ function App() {
   }
 
   function renderReadableText() {
-    const tokens = readerText.split(/([\p{L}\p{M}]+(?:[-’'][\p{L}\p{M}]+)*)/gu)
-    return tokens.map((token, index) => /^[\p{L}\p{M}]+(?:[-’'][\p{L}\p{M}]+)*$/u.test(token)
-      ? <button className={'reader-word' + (activeWord.toLocaleLowerCase() === token.toLocaleLowerCase() ? ' word-active' : '')} key={index} onClick={() => lookupWord(token)} onMouseEnter={() => lookupWord(token)}>{token}</button>
-      : <React.Fragment key={index}>{token}</React.Fragment>)
+    const paragraphs = readerText.split(/\\n\\s*\\n/).map(part => part.trim()).filter(Boolean)
+    return paragraphs.map((paragraph, paragraphIndex) => {
+      const tokens = paragraph.split(/([\\p{L}\\p{M}]+(?:[-’'][\\p{L}\\p{M}]+)*)/gu)
+      return <p className="reading-paragraph" key={paragraphIndex}>{tokens.map((token, index) => /^[\\p{L}\\p{M}]+(?:[-’'][\\p{L}\\p{M}]+)*$/u.test(token)
+        ? <button className={'reader-word' + (activeWord.toLocaleLowerCase() === token.toLocaleLowerCase() ? ' word-active' : '')} key={index} onClick={() => lookupWord(token)}>{token}</button>
+        : <React.Fragment key={index}>{token}</React.Fragment>)}</p>
+    })
   }
 
   if (view === 'texts') return <div className="reader-app"><header className="reader-topbar"><button className="back-button" onClick={()=>setView('home')}><ArrowLeft size={17}/> Library</button><strong className="hub-title">SAVED READINGS</strong><span className="reader-level">{savedTexts.length} TEXTS</span></header><main className="hub-page"><div className="hub-heading"><div><span className="eyebrow">YOUR READING SHELF</span><h1>Pick up where you left off.</h1><p>Saved privately in this browser. Export or back up your text separately.</p></div><button className="reader-open-link" onClick={()=>openReader()}>Add a reading <ArrowUpRight size={15}/></button></div>{savedTexts.length?<div className="saved-text-list">{savedTexts.map(item=><article key={item.id}><div><span>{new Date(item.savedAt).toLocaleDateString()} · {item.text.trim().split(/\\s+/).length} words</span><strong>{item.title}</strong><p>{item.text.slice(0,180)}{item.text.length>180?'…':''}</p></div><div><button onClick={()=>openReader(item.text,item.title)}>Continue reading</button><button aria-label="Delete saved reading" onClick={()=>{const next=savedTexts.filter(row=>row.id!==item.id);setSavedTexts(next);localStorage.setItem('fluentio-texts',JSON.stringify(next))}}><Trash2 size={15}/></button></div></article>)}</div>:<div className="hub-empty"><BookOpen size={28}/><h2>No saved readings yet</h2><p>Paste or upload a text in the reader, then choose Save reading.</p><button onClick={()=>openReader()}>Open reader</button></div>}</main></div>
@@ -398,7 +414,7 @@ function App() {
         {error&&<p className="reader-feedback">{error}</p>}<div className="reader-divider"/>
         <div className="reading-heading"><span className="eyebrow">INTERACTIVE READING</span><span className="reading-hint"><span className="hint-dot"/> Hover over or tap a word to look it up</span><div className="reading-tools"><button onClick={()=>setReaderFontSize(Math.max(14,readerFontSize-1))} aria-label="Decrease text size">A−</button><button onClick={()=>setReaderFontSize(Math.min(28,readerFontSize+1))} aria-label="Increase text size">A+</button>{phraseSelected&&<button className="phrase-lookup" onClick={()=>lookupPhrase(phraseSelected)}>Translate selected phrase</button>}</div></div>
         {readerText.trim()
-          ? <article className="reading-paper" onMouseUp={()=>{const selection=window.getSelection()?.toString().trim()||'';setPhraseSelected(selection.split(/\s+/).length>1?selection:'')}}><h2>{readerTitle || 'German reading'} {readerSource&&<a className="reader-source-link" href={readerSource} target="_blank" rel="noreferrer">Original source <ExternalLink size={12}/></a>}</h2><p style={{fontSize:readerFontSize+'px'}}>{renderReadableText()}</p></article>
+          ? <article className="reading-paper" onMouseUp={()=>{const selection=window.getSelection()?.toString().trim()||'';setPhraseSelected(selection.split(/\s+/).length>1?selection:'')}}><h2>{readerTitle || 'German reading'} {readerSource&&<a className="reader-source-link" href={readerSource} target="_blank" rel="noreferrer">Original source <ExternalLink size={12}/></a>}</h2><div className="reading-content" style={{fontSize:readerFontSize+'px'}}>{renderReadableText()}</div></article>
           : <div className="reader-empty"><BookOpen size={28}/><strong>Your reading will appear here</strong><span>Paste a German passage in the box above to get started.</span></div>}
         <div className="reader-source-note">{readerSource ? <>{readerSource.includes('gutenberg.org') ? 'This full text is hosted locally by Fluentio from Project Gutenberg; the source file and licence notice are retained. ' : 'This text is provided by German Wikisource. ' }Check the original source page for its licence and attribution details.</> : 'Use text you wrote yourself, public-domain material, or content whose licence permits this use. For other publishers, read on their original website.'}</div>
       </section>
