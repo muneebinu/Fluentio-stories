@@ -5,42 +5,25 @@ import { join } from 'node:path'
 const root = process.cwd()
 const mirrorDir = join(root, '.gutenberg-mirror')
 const outputDir = join(root, 'public', 'books')
-const curatedIds = [35794, 45189, 74008, 22367, 6651, 25791, 69327]
-const germanAuthorHints = [
-  'Guerber', 'Grimm', 'Storm', 'Kafka', 'Goethe', 'Schiller', 'Heine',
-  'Hoffmann', 'Hauff', 'Kleist', 'Stifter', 'Eichendorff', 'Fontane',
-  'Mann', 'Nietzsche', 'Lessing', 'Tieck', 'Droste', 'Mörike', 'Hebbel',
-  'Keller', 'Gotthelf', 'Busch', 'Wieland', 'Lenz', 'Büchner',
-  'Schopenhauer', 'Fichte', 'Hegel', 'Humboldt', 'Rilke', 'Trakl',
-  'Zweig', 'Schnitzler', 'Musäus', 'Brentano', 'Arnim', 'Bürger',
-  'Claudius', 'Gellert', 'Klopstock', 'Uhland', 'Jean Paul', 'Hofmannsthal',
-  'Adalbert', 'Jeremias', 'Hermann', 'Walther von der Vogelweide'
+const curated = [
+  { id: 35794, title: 'Märchen und Erzählungen für Anfänger · Erster Teil', author: 'H. A. Guerber', level: 'A1', sourceUrl: 'https://www.gutenberg.org/ebooks/35794' },
+  { id: 45189, title: 'Märchen und Erzählungen für Anfänger · Zweiter Teil', author: 'H. A. Guerber', level: 'A2', sourceUrl: 'https://www.gutenberg.org/ebooks/45189' },
+  { id: 74008, title: 'Der Schimmelreiter', author: 'Theodor Storm', level: 'B1', sourceUrl: 'https://www.gutenberg.org/ebooks/74008' },
+  { id: 22367, title: 'Die Verwandlung', author: 'Franz Kafka', level: 'B1', sourceUrl: 'https://www.gutenberg.org/ebooks/22367' },
+  { id: 6651, title: 'Immensee', author: 'Theodor Storm', level: 'B1', sourceUrl: 'https://www.gutenberg.org/ebooks/6651' },
+  { id: 25791, title: 'In der Strafkolonie', author: 'Franz Kafka', level: 'B1+', sourceUrl: 'https://www.gutenberg.org/ebooks/25791' },
+  { id: 69327, title: 'Der Prozess', author: 'Franz Kafka', level: 'B2', sourceUrl: 'https://www.gutenberg.org/ebooks/69327' }
 ]
-
-async function collectBooks() {
-  const books = []
-  const curatedResponse = await fetch('https://gutendex.com/books/?ids=' + curatedIds.join(','), { headers: { 'User-Agent': 'FluentioStories/1.0 (German reading project)', 'Accept': 'application/json' } })
-  if (curatedResponse.ok) { const curatedData = await curatedResponse.json(); for (const book of curatedData.results || []) books.push(book) }
-  let next = 'https://gutendex.com/books/?languages=de&mime_type=text%2Fplain&copyright=false&author_year_end=1955'
-  let pages = 0
-  while (next && pages < 40 && books.length < 160) {
-    const response = await fetch(next, { headers: { 'User-Agent': 'FluentioStories/1.0 (German reading project)', 'Accept': 'application/json' } })
-    if (!response.ok) throw new Error('Gutendex catalogue request failed: ' + response.status)
-    const data = await response.json()
-    for (const book of data.results || []) {
-      const authors = book.authors || []
-      const names = authors.map(author => author.name || '')
-      const oldEnough = authors.length > 0 && authors.every(author => Number.isFinite(author.death_year) && author.death_year <= 1955)
-      const knownGermanAuthor = names.some(name => germanAuthorHints.some(hint => name.toLowerCase().includes(hint.toLowerCase())))
-      const hasPlainText = Object.keys(book.formats || {}).some(type => type.startsWith('text/plain'))
-      if (oldEnough && knownGermanAuthor && hasPlainText) books.push(book)
-    }
-    next = data.next
-    pages += 1
-  }
-  const unique = [...new Map(books.map(book => [book.id, book])).values()]
-  return unique.slice(0, 160)
-}
+const categories = [
+  'Kategorie:Roman',
+  'Kategorie:Novelle',
+  'Kategorie:Erzählung',
+  'Kategorie:Märchen',
+  'Kategorie:Sage',
+  'Kategorie:Kriminalroman',
+  'Kategorie:Kinder- und Jugendliteratur'
+]
+const apiHeaders = { 'User-Agent': 'FluentioStories/1.0 (https://muneebinu.github.io/Fluentio-stories/)', 'Accept': 'application/json' }
 
 function walk(dir) {
   if (!existsSync(dir)) return []
@@ -50,46 +33,94 @@ function walk(dir) {
   })
 }
 
-async function main() {
+async function mirrorCuratedGutenberg() {
   mkdirSync(mirrorDir, { recursive: true })
-  mkdirSync(outputDir, { recursive: true })
-  const books = await collectBooks()
-  const ids = books.map(book => book.id)
-  if (!ids.length) throw new Error('No German public-domain book IDs were selected')
-
-  const idPattern = ids.join('|')
-  const acceptRegex = '.*(' + idPattern + ').*\\.txt$'
+  const ids = curated.map(book => book.id)
+  const acceptRegex = '.*(' + ids.join('|') + ').*\\.txt$'
   const harvestUrl = 'https://www.gutenberg.org/robot/harvest?filetypes[]=txt&langs[]=de'
-  console.log('Mirroring ' + ids.length + ' selected German text editions through Project Gutenberg’s documented robot-harvest route.')
-  execFileSync('wget', [
-    '--wait=2',
-    '--mirror',
-    '--span-hosts',
-    '--accept-regex=' + acceptRegex,
-    '--directory-prefix=' + mirrorDir,
-    harvestUrl
-  ], { stdio: 'inherit' })
-
+  try {
+    console.log('Requesting the seven curated reader files through Project Gutenberg’s documented robot-harvest route.')
+    execFileSync('wget', ['--wait=2', '--mirror', '--span-hosts', '--accept-regex=' + acceptRegex, '--directory-prefix=' + mirrorDir, harvestUrl], { stdio: 'inherit' })
+  } catch (error) {
+    console.warn('The Gutenberg mirror step did not complete; continuing with the Wikisource library.', error.message)
+  }
   const files = walk(mirrorDir).filter(path => path.toLowerCase().endsWith('.txt'))
-  const copied = []
-  for (const id of ids) {
-    const matches = files.filter(path => path.includes(String(id)))
+  const output = []
+  for (const book of curated) {
+    const matches = files.filter(path => path.includes(String(book.id)))
     if (!matches.length) continue
     matches.sort((a, b) => statSync(b).size - statSync(a).size)
-    const destination = join(outputDir, id + '.txt')
+    const destination = join(outputDir, book.id + '.txt')
     copyFileSync(matches[0], destination)
-    copied.push(id)
+    const text = (await import('node:fs')).readFileSync(destination, 'utf8')
+    output.push({ ...book, provider: 'gutenberg', word_count: text.trim().split(/\\s+/).length, subjects: ['learner reader', book.level] })
   }
-  const copiedBooks = books.filter(book => copied.includes(book.id)).map(book => ({ id: book.id, title: book.title, authors: book.authors || [], subjects: book.subjects || [], download_count: book.download_count || 0 }))
-  writeFileSync(join(outputDir, 'index.json'), JSON.stringify({ ids: copied, count: copied.length, books: copiedBooks }, null, 2))
+  return output
+}
+
+async function fetchWikisourceCategory(category) {
+  const params = new URLSearchParams({
+    action: 'query',
+    generator: 'categorymembers',
+    gcmtitle: category,
+    gcmtype: 'page',
+    gcmlimit: '100',
+    prop: 'extracts',
+    explaintext: '1',
+    exsectionformat: 'plain',
+    format: 'json',
+    origin: '*'
+  })
+  const response = await fetch('https://de.wikisource.org/w/api.php?' + params.toString(), { headers: apiHeaders })
+  if (!response.ok) throw new Error('Wikisource category ' + category + ' returned ' + response.status)
+  const data = await response.json()
+  return Object.values(data.query?.pages || {})
+}
+
+async function mirrorWikisource() {
+  const found = new Map()
+  for (const category of categories) {
+    try {
+      const pages = await fetchWikisourceCategory(category)
+      for (const page of pages) {
+        const title = page.title || ''
+        const text = (page.extract || '').trim()
+        if (!page.pageid || !title || title.includes(':') || text.length < 6000) continue
+        if (found.has(page.pageid)) continue
+        const id = 'ws-' + page.pageid
+        const sourceUrl = 'https://de.wikisource.org/wiki/' + encodeURIComponent(title.replaceAll(' ', '_'))
+        const authorMatch = text.match(/(?:Autor|Verfasser)[:：]\\s*([^\\n]+)/i)
+        const authors = [{ name: authorMatch?.[1]?.trim() || 'Wikisource edition' }]
+        const wordCount = text.split(/\\s+/).filter(Boolean).length
+        found.set(page.pageid, {
+          id, title, authors, subjects: [category.replace('Kategorie:', '')],
+          provider: 'wikisource', sourceUrl, word_count: wordCount
+        })
+        writeFileSync(join(outputDir, id + '.txt'), text, 'utf8')
+        if (found.size >= 150) break
+      }
+      if (found.size >= 150) break
+    } catch (error) {
+      console.warn('Skipping Wikisource category ' + category + ': ' + error.message)
+    }
+  }
+  return [...found.values()]
+}
+
+async function main() {
+  mkdirSync(outputDir, { recursive: true })
+  const gutenbergBooks = await mirrorCuratedGutenberg()
+  const wikisourceBooks = await mirrorWikisource()
+  const books = [...gutenbergBooks, ...wikisourceBooks]
+  const ids = books.map(book => book.id)
+  writeFileSync(join(outputDir, 'index.json'), JSON.stringify({ ids, count: books.length, books }, null, 2))
   writeFileSync(join(outputDir, 'NOTICE.txt'),
-    'German-language public-domain text editions mirrored for Fluentio Stories. ' +
-    'Each text is retained with its Project Gutenberg header and licence notice. ' +
-    'Project Gutenberg copyright determinations are US-based; local copyright law and any separate translation rights must be checked. ' +
-    'The in-app cards link to the original ebook landing pages.\n'
+    'Fluentio Stories hosts selected full-text editions from Project Gutenberg and German Wikisource. ' +
+    'Project Gutenberg files are retained with their original licence headers. German Wikisource texts are attributed to their source pages; check each page for its specific public-domain or Creative Commons licence. ' +
+    'Copyright status can differ by country and translations may have separate rights.\\n'
   )
-  console.log('Hosted ' + copied.length + ' full-text books locally.')
-  if (copied.length < 5) throw new Error('Too few full texts were mirrored; refusing to publish an almost-empty book shelf.')
+  console.log('Hosted ' + books.length + ' full-text German works (' + gutenbergBooks.length + ' Gutenberg learner/classic editions; ' + wikisourceBooks.length + ' Wikisource works).')
+  if (books.length < 5) throw new Error('Too few full texts were mirrored; refusing to publish an almost-empty library.')
 }
 
 main().catch(error => {
