@@ -179,6 +179,7 @@ function App() {
     setReaderText(text)
     setReaderTitle(title)
     setActiveWord('')
+    setPhraseSelected('')
     setTranslation('')
     setDictionary('')
     setLexical(null)
@@ -196,7 +197,7 @@ function App() {
     }
     const text = await file.text()
     setReaderText(text)
-    if (!readerTitle) setReaderTitle(file.name.replace(/\\.txt$/i, ''))
+    if (!readerTitle) setReaderTitle(file.name.replace(/\.txt$/i, ''))
     setActiveWord('')
     setTranslation('')
     setDictionary('')
@@ -242,7 +243,7 @@ function App() {
         <p className="reader-instructions">Paste text from a source you are permitted to use, then tap any German word to explore it.</p>
         <textarea className="reader-paste" value={readerText} onChange={e=>setReaderText(e.target.value)} placeholder="Paste your German text here…" aria-label="German reading text"/>
         <div className="reader-toolbar"><span>{readerText.trim() ? readerText.trim().split(/\s+/).length + ' words' : 'Your text stays in this browser session.'}</span><div className="reader-toolbar-actions"><button onClick={saveCurrentText}>Save reading</button><label className="upload-text-button">Upload .txt<input type="file" accept=".txt,text/plain" onChange={e=>loadTextFile(e.target.files?.[0])}/></label><button onClick={()=>{setReaderText('');setReaderTitle('');setActiveWord('')}}>Clear text</button></div></div>
-        <div className="reader-divider"/>
+        {error&&<p className="reader-feedback">{error}</p>}<div className="reader-divider"/>
         <div className="reading-heading"><span className="eyebrow">INTERACTIVE READING</span><span className="reading-hint"><span className="hint-dot"/> Tap a word to look it up</span>{phraseSelected&&<button className="phrase-lookup" onClick={()=>lookupPhrase(phraseSelected)}>Translate selected phrase</button>}</div>
         {readerText.trim()
           ? <article className="reading-paper" onMouseUp={()=>{const selection=window.getSelection()?.toString().trim()||'';setPhraseSelected(selection.split(/\s+/).length>1?selection:'')}}><h2>{readerTitle || 'German reading'}</h2><p>{renderReadableText()}</p></article>
