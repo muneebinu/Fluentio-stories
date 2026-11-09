@@ -91,7 +91,7 @@ function App() {
 
   async function openWikisourcePage(page) {
     const title = page.title
-    const cacheKey = 'fluentio-wikisource-' + (page.pageid || title)
+    const cacheKey = 'fluentio-wikisource-v2-' + (page.pageid || title)
     const source = 'https://de.wikisource.org/wiki/' + encodeURIComponent(title.replaceAll(' ','_'))
     setBookLoadingId(page.pageid || title)
     setBooksError('')
@@ -412,7 +412,7 @@ function App() {
           <div className="reader-toolbar"><span>{readerText.trim() ? readerText.trim().split(/\s+/).length.toLocaleString() + ' words · approx. ' + Math.max(1,Math.ceil(readerText.trim().split(/\s+/).length/250)) + ' reading pages' : 'Your text stays in this browser session.'}</span><div className="reader-toolbar-actions"><button onClick={speakPassage}>Listen to text</button><button onClick={stopPassage} disabled={!isSpeaking}>Stop audio</button><button onClick={saveCurrentText}>Save reading</button><label className="upload-text-button">Upload .txt<input type="file" accept=".txt,text/plain" onChange={e=>loadTextFile(e.target.files?.[0])}/></label><button onClick={()=>{setReaderText('');setReaderTitle('');setActiveWord('')}}>Clear text</button></div></div>
         </details>
         {error&&<p className="reader-feedback">{error}</p>}<div className="reader-divider"/>
-        <div className="reading-heading"><span className="eyebrow">INTERACTIVE READING</span><span className="reading-hint"><span className="hint-dot"/> Hover over or tap a word to look it up</span><div className="reading-tools"><button onClick={()=>setReaderFontSize(Math.max(14,readerFontSize-1))} aria-label="Decrease text size">A−</button><button onClick={()=>setReaderFontSize(Math.min(28,readerFontSize+1))} aria-label="Increase text size">A+</button>{phraseSelected&&<button className="phrase-lookup" onClick={()=>lookupPhrase(phraseSelected)}>Translate selected phrase</button>}</div></div>
+        <div className="reading-heading"><span className="eyebrow">INTERACTIVE READING</span><span className="reading-hint"><span className="hint-dot"/> Click or tap a word to look it up</span><div className="reading-tools"><button onClick={()=>setReaderFontSize(Math.max(14,readerFontSize-1))} aria-label="Decrease text size">A−</button><button onClick={()=>setReaderFontSize(Math.min(28,readerFontSize+1))} aria-label="Increase text size">A+</button>{phraseSelected&&<button className="phrase-lookup" onClick={()=>lookupPhrase(phraseSelected)}>Translate selected phrase</button>}</div></div>
         {readerText.trim()
           ? <article className="reading-paper" onMouseUp={()=>{const selection=window.getSelection()?.toString().trim()||'';setPhraseSelected(selection.split(/\s+/).length>1?selection:'')}}><h2>{readerTitle || 'German reading'} {readerSource&&<a className="reader-source-link" href={readerSource} target="_blank" rel="noreferrer">Original source <ExternalLink size={12}/></a>}</h2><div className="reading-content" style={{fontSize:readerFontSize+'px'}}>{renderReadableText()}</div></article>
           : <div className="reader-empty"><BookOpen size={28}/><strong>Your reading will appear here</strong><span>Paste a German passage in the box above to get started.</span></div>}
