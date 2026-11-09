@@ -434,7 +434,7 @@ function App() {
   return <div className="app-shell">
     <header className="topbar">
       <a className="brand" href="#home" aria-label="Fluentio Stories home"><img src="https://raw.githubusercontent.com/muneebinu/Fluentio-Academia/main/assets/logo.png" alt="Fluentio Academia"/><span className="brand-divider"/><span className="brand-name">STORIES</span></a>
-      <nav className="nav-links"><a href="#library">Explore</a><a href="#how">How it works</a><button onClick={()=>openReader()}>Reader</button><button onClick={()=>setView('vocab')}>Vocabulary</button><button onClick={openGrammar}>Grammar</button></nav>
+      <nav className="nav-links"><a href="#library">Explore</a><a href="#how">How it works</a><button onClick={()=>openReader()}>Reader</button><button onClick={()=>setView('vocab')}>Vocabulary</button></nav>
       <button className="top-cta" onClick={()=>openReader()}>Open reader <ArrowUpRight size={16}/></button>
     </header>
     <main id="home">
