@@ -45,11 +45,11 @@ async function fetchCategoryMembers(category) {
     list: 'categorymembers',
     cmtitle: category,
     cmtype: 'page',
-    cmlimit: '100',
+    cmlimit: '80',
     format: 'json',
     origin: '*'
   })
-  const response = await fetch('https://de.wikisource.org/w/api.php?' + params.toString(), { headers: apiHeaders })
+  const response = await fetch('https://de.wikisource.org/w/api.php?' + params.toString(), { headers: apiHeaders, signal: AbortSignal.timeout(15000) })
   if (!response.ok) throw new Error(category + ' category request returned ' + response.status)
   const data = await response.json()
   if (data.error) throw new Error(data.error.info || 'Wikisource category error')
@@ -58,7 +58,8 @@ async function fetchCategoryMembers(category) {
 
 async function fetchFullText(title) {
   const params = new URLSearchParams({ action: 'parse', page: title, prop: 'text', format: 'json', origin: '*' })
-  const response = await fetch('https://de.wikisource.org/w/api.php?' + params.toString(), { headers: apiHeaders })
+  let response
+  try { response = await fetch('https://de.wikisource.org/w/api.php?' + params.toString(), { headers: apiHeaders, signal: AbortSignal.timeout(20000) }) } catch { return '' }
   if (!response.ok) return ''
   const data = await response.json()
   if (data.error) return ''
@@ -80,8 +81,8 @@ async function mirrorWikisource() {
       const members = await fetchCategoryMembers(category)
       const titles = members.map(page => page.title).filter(title => title && !title.includes(':'))
       console.log('Wikisource ' + category + ': checking ' + titles.length + ' titles.')
-      for (let start = 0; start < titles.length && found.size < 150; start += 3) {
-        const batch = titles.slice(start, start + 3)
+      for (let start = 0; start < Math.min(titles.length, 60) && found.size < 150; start += 6) {
+        const batch = titles.slice(start, start + 6)
         const texts = await Promise.all(batch.map(title => fetchFullText(title)))
         for (let i = 0; i < batch.length; i++) {
           const title = batch[i]
@@ -104,9 +105,10 @@ async function mirrorWikisource() {
           writeFileSync(join(outputDir, id + '.txt'), text, 'utf8')
         }
         if (found.size >= 150) break
-        await pause(1000)
+        console.log('Processed ' + Math.min(start + batch.length, titles.length) + ' ' + category + ' candidates; saved ' + found.size + ' full texts.')
+        await pause(500)
       }
-      await pause(1000)
+      await pause(500)
     } catch (error) {
       console.warn('Skipping ' + category + ': ' + error.message)
     }
