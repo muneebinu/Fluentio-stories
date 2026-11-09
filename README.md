@@ -2,52 +2,44 @@
 
 A German reading and vocabulary workspace for learners from A1 to B2, built with React and Vite.
 
-## Features currently implemented
+## Reading library
 
-- Read original in-app German stories at A1, A2, B1 and B2 without pasting text.
-- Browse German Wikisource texts by genre (fairy tales, short stories, legends, novellas, novels and anecdotes), search titles, and load available transcriptions into the reader.
-- Browse and filter a directory of external German-reading publishers by CEFR level.
-- Open a distraction-free reading workspace.
-- Paste German text or import a plain-text `.txt` file.
-- Hover over or tap words in a passage to request English translation and German Wiktionary information; successful lookups are cached locally for faster repeat access.
-- Dictionary lookup integrations:
-  - Wiktapi for structured Wiktionary-derived entries, definitions and available inflected forms.
-  - German Language API for CEFR vocabulary, part of speech, gender and example sentences.
-  - MyMemory as a translation fallback.
-  - German Wiktionary MediaWiki API as a dictionary-extract fallback.
-- Save reading texts and vocabulary locally in the browser.
-- Review saved vocabulary with flashcards and interval-based review scheduling.
-- Export saved words as CSV.
-- German word and full-passage read-aloud using the browser's speech synthesis engine.\n- Adjustable reading font size.\n- A Chrome/Edge Manifest V3 web-reader extension for selected words and phrases on other webpages, with its own local vocabulary and CSV export.
-- Browse a grammar library using the German Language API.
-- No account or registration required.
+- Eight original German short stories are included directly in the app, with A1, A2, B1 and B2 levels.
+- A live catalogue connects to German Wikisource. Browse fairy tales, short stories, legends, novellas, novels and anecdotes, search titles, and load available transcriptions into the Fluentio reader.
+- The German Wikisource portal reports more than 58,000 works. The catalogue is not CEFR-graded, and transcription availability and quality vary by work.
+- External German-learning publishers remain available in a separate source directory.
 
-## Browser extension\n\nThe `browser-extension/` folder contains a Chrome/Edge Manifest V3 extension. It looks up only text selected by the learner on a webpage; it does not bulk-copy publisher pages. See [browser-extension/README.md](browser-extension/README.md) for local installation.\n\n## Local-first data
+## Reader and vocabulary
 
-Saved readings and vocabulary are stored in the current browser using `localStorage`. It is not synced between devices and can be lost if browser site data is cleared. CSV export is provided for backups. This version has no user accounts or cloud database.
+- Open built-in stories and Wikisource texts without pasting anything.
+- Hover over or click words to request an English meaning and German dictionary information.
+- Translation tries a browser-accessible Google translation endpoint first and MyMemory as a fallback. The Google endpoint is unofficial and may change; MyMemory has provider usage limits.
+- German Wiktionary's MediaWiki API supplies dictionary extracts where available.
+- Successful lookups are cached locally for faster repeat access.
+- Save readings and vocabulary in the current browser, practise words with flashcards, and export vocabulary as CSV.
+- Browser speech synthesis reads German words and passages aloud.
+- The optional paste/upload workflow remains available for text the learner is permitted to use.
+- Grammar library and Chrome/Edge Manifest V3 web-reader extension are also included.
 
-## API services and limits
+## Content, licensing and attribution
 
-- Wiktapi: https://wiktapi.dev/ — public structured Wiktionary-derived API. Data coverage varies by word.
-- German Language API: https://rep12.com/docs/ — published demo key is limited to 1,000 requests/day and 10 requests/second. A production key or stable hosted arrangement may be needed for public launch.
-- MyMemory: https://mymemory.translated.net/ — external translation service with its own availability and usage policies.
-- German Wiktionary: https://de.wiktionary.org/ — fallback dictionary source.
+The eight starter stories are original texts written for Fluentio Stories.
 
-All API calls are made from the visitor's browser in this static build. If a provider changes CORS settings, rate limits, API availability, or terms, the related feature may temporarily stop working. Do not treat third-party dictionary data as infallible.
+The larger reading catalogue is retrieved from German Wikisource. Wikisource includes public-domain and Creative Commons works. Every opened catalogue text links back to its original Wikisource page. Check the individual work's licence and follow its attribution and share-alike requirements before reuse or redistribution. Availability and copyright status can differ by country.
 
-## Content and copyright
+External publisher materials are linked, not copied into Fluentio Stories.
 
-The in-app starter stories are original texts written for Fluentio Stories. The larger text catalogue is retrieved from German Wikisource, which includes public-domain and Creative Commons works. Each text links back to its source page; check the individual work's licence and follow attribution/share-alike requirements before reuse. External reading sources remain linked to their original publishers.
+## Data and technical limitations
 
-## Current limitations / next engineering steps
+- Saved vocabulary and readings are stored in browser `localStorage`; they are not synced between devices.
+- Dictionary and translation services are third-party services. Their availability, rate limits, CORS policies and responses can change. Translations are aids, not guaranteed linguistic judgments.
+- Not every Wikisource entry has a clean, complete transcription.
+- The app has no backend, user accounts, shared vocabulary sync, or server-side translation cache.
+- The flashcard scheduler is a lightweight interval system, not a validated SM-2 implementation.
 
-- Vocabulary and review data are local to one browser; cross-device sync requires a backend and user accounts.
-- Review scheduling is a lightweight interval system, not a validated SM-2 implementation.
-- German inflection and lemma detection depend on the dictionary provider's returned entry; not every inflected form will resolve.
-- Arbitrary websites cannot reliably be imported into the reader because of browser CORS, publisher restrictions and copyright. A browser extension or permitted source integrations would be needed.
-- The German Wikisource catalogue is a large community-maintained collection (about 58,000 works according to its portal); it is not a CEFR-graded catalogue, and text availability/quality varies by page.
-- Audio playback uses voices installed in the visitor's browser/device; voice quality and availability vary.
-- A stable production deployment should use a backend proxy/cache for API calls, observability, rate limiting and provider credentials where needed.
+## Browser extension
+
+The `browser-extension/` folder contains a Chrome/Edge Manifest V3 extension. It looks up only text selected by the learner on a webpage; it does not bulk-copy publisher pages. See [browser-extension/README.md](browser-extension/README.md) for local installation.
 
 ## Development
 
@@ -57,4 +49,4 @@ npm run dev
 npm run build
 ```
 
-GitHub Pages deployment is configured as a manual workflow and remains intentionally separate from development.
+GitHub Pages deployment is configured through GitHub Actions.
