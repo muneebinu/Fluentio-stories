@@ -19,3 +19,9 @@ jobs:
           node-version: 20
       - run: npm install
       - run: npm run build
+      - name: Validate browser extension
+        run: |
+          node --check browser-extension/background.js
+          node --check browser-extension/content.js
+          node --check browser-extension/popup.js
+          node -e "JSON.parse(require('fs').readFileSync('browser-extension/manifest.json', 'utf8'))"
