@@ -57,7 +57,6 @@ function App() {
   const [booksError, setBooksError] = useState('')
   const [bookLoadingId, setBookLoadingId] = useState(null)
   const [bookCategory, setBookCategory] = useState('Kategorie:Roman')
-  const [bookProvider, setBookProvider] = useState('wikisource')
   const [readerSource, setReaderSource] = useState('')
   const [lookupCache, setLookupCache] = useState(() => { try { return JSON.parse(localStorage.getItem('fluentio-lookup-cache') || '{}') } catch { return {} } })
   const lookupRequest = useRef(0)
