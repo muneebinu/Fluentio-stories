@@ -1,14 +1,33 @@
 # Fluentio Stories
 
-A simple German reading room for learners. The homepage is intentionally focused on A1, A2 and B1 stories plus a small shelf of German classics.
+Fluentio Stories is a German reading workspace with a curated directory of real, free graded-story collections and a separate shelf of complete public-domain literature.
 
-## Reading library
+## Graded story collections
 
-- Three original Fluentio storybooks: **Der kleine Schlüssel** (A1), **Ein Sommer in Lindenfeld** (A2), and **Das Licht im Bahnhof** (B1).
-- Each story is divided into chapters and opens directly in the in-app reader.
-- Three classic works are listed separately for more advanced readers: **Immensee**, **Die Verwandlung**, and **Der Schimmelreiter**. These are original literary works, not graded A1–B1 material.
-- The classics are loaded from German Wikisource when selected. Source transcription quality and availability vary; do not treat every external transcription as verified or simplified.
-- CEFR labels on original stories are editorial estimates, not official certification.
+The homepage links directly to publisher-hosted full-text collections:
+
+| Level | Collection | Stories |
+|---|---|---:|
+| A1 | Lenguia | 68 |
+| A1 | Morgenlese | 55 |
+| A2 | Lenguia | 101 |
+| A2 | Morgenlese | 52 |
+| B1 | Lenguia | 100 |
+| B1 | Morgenlese | 54 |
+
+Counts are the publishers' displayed collection counts, not Fluentio-authored stories. The publishers host the graded stories and their translations/quizzes. Fluentio links to those full collections rather than copying third-party copyrighted material without permission.
+
+## Complete public-domain literature
+
+The classic shelf includes full texts from German Wikisource and Project Gutenberg:
+- Theodor Storm: *Immensee*, *Pole Poppenspäler*, *Der Schimmelreiter*
+- Franz Kafka: *Die Verwandlung*
+- Johann Wolfgang von Goethe: *Die Leiden des jungen Werthers*
+- Theodor Fontane: *Effi Briest*
+- Johanna Spyri: *Heidis Lehr- und Wanderjahre*
+- Thomas Mann: *Buddenbrooks: Verfall einer Familie*
+
+Project Gutenberg's public-domain statement is territorial: users outside the United States should check the copyright law where they are located. The app does not claim these classics are CEFR-graded.
 
 ## Reader tools
 
@@ -16,18 +35,15 @@ A simple German reading room for learners. The homepage is intentionally focused
 - Save vocabulary locally, practise with flashcards, and export vocabulary as CSV.
 - Save reading texts in the current browser.
 - Browser speech synthesis can read German words and passages aloud.
-- Students can paste or upload a text they are permitted to use.
+- Paste or upload a text you have permission to use.
+- Project Gutenberg plain-text editions are loaded into the in-app reader when the publisher permits the browser request; if that request is blocked, the source edition link remains available.
 
-## Important content note
+## Limitations
 
-The three original storybooks are currently short, chapter-based learner stories. They are **not yet 50–120 printed pages**. The classic titles are full literary works where the source transcription is available, but their language is substantially harder than A1–B1. Do not describe them as graded readers.
-
-## Data and technical limitations
-
+- Publisher-hosted graded stories open on their original sites because their text is not licensed for Fluentio to republish.
 - Vocabulary and saved readings use browser local storage and do not sync across devices.
 - Translation and dictionary data come from third-party services; availability and accuracy can vary.
-- The app has no user accounts or cloud sync.
-- The flashcard scheduler is a lightweight interval system.
+- No user accounts or cloud sync.
 
 ## Development
 
