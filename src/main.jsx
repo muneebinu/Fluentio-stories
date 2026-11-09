@@ -243,9 +243,11 @@ function App() {
       const lexicalData = { lemma: clean, english: translated, pos: '', gender: '', definitions: [], forms: [], example: '', exampleEn: '', level: '' }
       setTranslation(translated); setDictionary(dictionaryText); setLexical(lexicalData)
       if (!translated && !dictionaryText) setError('No result was returned. Try the dictionary base form or try again shortly.')
-      const nextCache = { ...lookupCache, [clean.toLocaleLowerCase()]: { translation: translated, dictionary: dictionaryText, lexical: lexicalData } }
-      setLookupCache(nextCache)
-      try { localStorage.setItem('fluentio-lookup-cache', JSON.stringify(nextCache)) } catch {}
+      if (translated || dictionaryText) {
+        const nextCache = { ...lookupCache, [clean.toLocaleLowerCase()]: { translation: translated, dictionary: dictionaryText, lexical: lexicalData } }
+        setLookupCache(nextCache)
+        try { localStorage.setItem('fluentio-lookup-cache', JSON.stringify(nextCache)) } catch {}
+      }
     } catch {
       setError('Translation services are temporarily unavailable. Please try again.')
     } finally { if (requestId === lookupRequest.current) setLoading(false) }
