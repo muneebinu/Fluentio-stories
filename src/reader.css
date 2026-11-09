@@ -66,3 +66,6 @@
 @media(max-width:650px){.saved-text-list article{align-items:flex-start;flex-direction:column}.saved-text-list article>div:last-child{width:100%}.saved-text-list article>div:last-child button:first-child{flex:1}}
 
 .reader-feedback{margin:7px 0;color:#E64833;font:10px 'DM Mono',monospace;line-height:1.5}
+
+.reading-tools{display:flex;align-items:center;gap:6px}.reading-tools>button{border:1px solid rgba(36,72,85,.22);background:#fffaf2;color:#244855;padding:6px 8px;font:10px 'DM Mono',monospace;cursor:pointer}.reader-toolbar-actions button:disabled{opacity:.35;cursor:not-allowed}
+@media(max-width:650px){.reading-tools{flex-wrap:wrap}.reader-toolbar{align-items:flex-start;gap:10px;flex-direction:column}.reader-toolbar-actions{flex-wrap:wrap}}
