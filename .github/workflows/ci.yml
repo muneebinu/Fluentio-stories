@@ -19,6 +19,8 @@ jobs:
           node-version: 20
       - run: npm install
       - run: npm run build
+      - name: Validate book mirror script
+        run: node --check scripts/mirror-german-library.mjs
       - name: Validate browser extension
         run: |
           node --check browser-extension/background.js
