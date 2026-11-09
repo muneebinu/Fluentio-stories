@@ -179,7 +179,7 @@ function App() {
       if (text.length > 1500000) {
         text = text.slice(0, 1500000) + '\\n\\n[Reader limit reached. The source edition contains additional text.]'
       }
-      text = text.replace(/\\n[ \\t]+/g, '\n').replace(/\n{3,}/g, '\\n\\n').trim()
+      text = text.replace(/\\n[ \\t]+/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
       try { localStorage.setItem(cacheKey, text) } catch {}
       openReader(text, title, source)
     } catch (error) {
@@ -203,7 +203,7 @@ function App() {
       if (start) text = text.slice(start.index + start[0].length)
       const end = text.search(/\*\*\* END OF (?:THE|THIS) PROJECT GUTENBERG EBOOK/i)
       if (end >= 0) text = text.slice(0, end)
-      text = text.replace(/\r/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\\n\\n').trim()
+      text = text.replace(/\r/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
       if (text.length < 1000) throw new Error('The full-text file did not contain enough readable text')
       openReader(text, book.title, book.source)
     } catch (error) {
