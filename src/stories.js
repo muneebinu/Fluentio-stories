@@ -178,6 +178,6 @@ Auf dem Heimweg nimmt sie wieder den Zug. Als der alte Bahnhof am Fenster vorbei
 
 export const classicBooks = [
   { id:'classic-1', title:'Immensee', author:'Theodor Storm', level:'KLASSIKER', description:'Eine kurze Novelle über Erinnerung, Liebe und verpasste Möglichkeiten.', pageTitle:'Immensee', source:'https://de.wikisource.org/wiki/Immensee' },
-  { id:'classic-2', title:'Die Verwandlung', author:'Franz Kafka', level:'KLASSIKER', description:'Kafkas berühmte Erzählung über Gregor Samsa und seine Familie.', pageTitle:'Die_Verwandlung', source:'https://de.wikisource.org/wiki/Die_Verwandlung' },
-  { id:'classic-3', title:'Der Schimmelreiter', author:'Theodor Storm', level:'KLASSIKER', description:'Eine längere Erzählung über einen Deichgrafen, das Meer und den Kampf gegen die Natur.', pageTitle:'Der_Schimmelreiter', source:'https://de.wikisource.org/wiki/Der_Schimmelreiter' }
+  { id:'classic-2', title:'Die Verwandlung', author:'Franz Kafka', level:'KLASSIKER', description:'Kafkas berühmte Erzählung über Gregor Samsa und seine Familie.', pageTitle:'Die Verwandlung (Franz Kafka)', source:'https://de.wikisource.org/wiki/Die_Verwandlung_(Franz_Kafka)' },
+  { id:'classic-3', title:'Pole Poppenspäler', author:'Theodor Storm', level:'KLASSIKER', description:'Eine längere Erzählung über Kindheit, Puppenspiel und eine lebenslange Freundschaft.', pageTitle:'Pole Poppenspäler', source:'https://de.wikisource.org/wiki/Pole_Poppensp%C3%A4ler' }
 ]
