@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { ArrowLeft, ArrowUpRight, BookOpen, Bookmark, Check, ChevronDown, ExternalLink, Globe2, Search, Sparkles, X, Languages, Volume2, Download, Trash2, RotateCcw, GraduationCap } from 'lucide-react'
 import './styles.css'
 import './reader.css'
-import { originalStories, classicBooks } from './stories.js'
+import { storyCollections, classicBooks } from './stories.js'
 
 const levels = ['All levels', 'A1', 'A2', 'B1', 'B2']
 
@@ -186,6 +186,29 @@ function App() {
       console.error('Fluentio book loading failed:', title, error)
       const reason = error?.message || 'Unknown loading error'
       setBooksError('Could not open "' + title + '" inside Fluentio. ' + reason + ' Choose another transcription-ready edition; scan-only entries cannot be read as text yet.')
+    } finally {
+      setBookLoadingId(null)
+    }
+  }
+
+  async function openGutenbergBook(book) {
+    setBookLoadingId(book.id)
+    setBooksError('')
+    try {
+      const url = 'https://www.gutenberg.org/cache/epub/' + book.gutenbergId + '/pg' + book.gutenbergId + '.txt'
+      const response = await fetch(url, { signal: AbortSignal.timeout(30000) })
+      if (!response.ok) throw new Error('Project Gutenberg returned HTTP ' + response.status)
+      let text = await response.text()
+      const start = text.match(/\\*\\*\\* START OF (?:THE|THIS) PROJECT GUTENBERG EBOOK[^\\n]*\\n/i)
+      if (start) text = text.slice(start.index + start[0].length)
+      const end = text.search(/\\*\\*\\* END OF (?:THE|THIS) PROJECT GUTENBERG EBOOK/i)
+      if (end >= 0) text = text.slice(0, end)
+      text = text.replace(/\\r/g, '').replace(/[ \\t]+\\n/g, '\\n').replace(/\\n{3,}/g, '\\n\\n').trim()
+      if (text.length < 1000) throw new Error('The full-text file did not contain enough readable text')
+      openReader(text, book.title, book.source)
+    } catch (error) {
+      console.error('Fluentio Gutenberg book loading failed:', book.title, error)
+      setBooksError('Could not load this full text inside Fluentio right now. Use the Source edition link on this book to read the complete free text.')
     } finally {
       setBookLoadingId(null)
     }
@@ -441,30 +464,30 @@ function App() {
       <section className="hero">
         <div className="hero-copy">
           <div className="eyebrow"><span className="eyebrow-dot"/> GERMAN READING ROOM</div>
-          <h1>One story.<br/><em>One step</em> forward.</h1>
-          <p className="hero-description">Simple German stories for A1, A2 and B1. Read at your own pace, tap a word for its meaning, and enjoy the story.</p>
-          <button className="hero-button" onClick={()=>document.getElementById('library')?.scrollIntoView({behavior:'smooth'})}>Choose a story <ArrowUpRight size={17}/></button>
-          <div className="hero-meta"><span><BookOpen size={15}/> Original learner stories</span><span><Globe2 size={15}/> A1 · A2 · B1</span></div>
+          <h1>Find your level.<br/><em>Get lost</em> in a story.</h1>
+          <p className="hero-description">Read real German stories from free graded-reading collections, then move on to complete public-domain novels and classic literature.</p>
+          <button className="hero-button" onClick={()=>document.getElementById('library')?.scrollIntoView({behavior:'smooth'})}>Explore the library <ArrowUpRight size={17}/></button>
+          <div className="hero-meta"><span><BookOpen size={15}/> 430+ graded stories</span><span><Globe2 size={15}/> A1 · A2 · B1</span></div>
         </div>
-        <div className="hero-art" aria-label="Illustration of an open book"><div className="art-note note-top">LESEN · LERNEN · WACHSEN</div><div className="book-shadow"/><div className="book"><div className="book-label">DEUTSCH<br/>ENTDECKEN</div><div className="book-rule"/><div className="book-lines"><i/><i/><i/><i/></div><div className="book-mark">01 / 03</div></div><div className="art-stamp">WORT<br/>FÜR WORT</div><div className="art-note note-bottom">YOUR NEXT CHAPTER STARTS HERE.</div></div>
+        <div className="hero-art" aria-label="Illustration of an open book"><div className="art-note note-top">LESEN · LERNEN · WACHSEN</div><div className="book-shadow"/><div className="book"><div className="book-label">DEUTSCH<br/>ENTDECKEN</div><div className="book-rule"/><div className="book-lines"><i/><i/><i/><i/></div><div className="book-mark">A1 / B1</div></div><div className="art-stamp">WORT<br/>FÜR WORT</div><div className="art-note note-bottom">YOUR NEXT CHAPTER STARTS HERE.</div></div>
       </section>
       <section className="library-section" id="library">
-        <div className="section-heading"><div><div className="eyebrow">THE READING ROOM</div><h2>Choose your next story.</h2><p>Three original stories, written for German learners. Each one opens directly in the Fluentio reader.</p></div></div>
-        <div className="filters">{['All levels','A1','A2','B1'].map(l=><button key={l} className={level===l?'selected':''} onClick={()=>setLevel(l)}>{l}</button>)}<span className="result-count">{originalStories.filter(s=>level==='All levels'||s.level===level).length} STORIES</span></div>
-        <div className="story-grid">
-          {originalStories.filter(s=>level==='All levels'||s.level===level).map((story,index)=><article className="story-card fluentio-story-card" key={story.id}>
-            <span className="story-level">{story.level} · {story.topic}</span>
-            <h4>{story.title}</h4><p>{story.description}</p>
-            <small>{story.chapters.length} chapters · original Fluentio story</small>
-            <button onClick={()=>openReader(story.chapters.join('\n\n'),story.title,'')}>Read story <ArrowUpRight size={14}/></button>
+        <div className="section-heading"><div><div className="eyebrow">FREE GRADED STORY COLLECTIONS</div><h2>Stories for every level.</h2><p>Choose a level and open a real collection of complete stories. These are existing publisher libraries, not sample stories written for Fluentio.</p></div></div>
+        <div className="filters">{['All levels','A1','A2','B1'].map(l=><button key={l} className={level===l?'selected':''} onClick={()=>setLevel(l)}>{l}</button>)}<span className="result-count">{storyCollections.filter(s=>level==='All levels'||s.level===level).reduce((sum,s)=>sum+s.count,0)} STORIES IN COLLECTIONS</span></div>
+        <div className="story-grid collection-grid">
+          {storyCollections.filter(s=>level==='All levels'||s.level===level).map(collection=><article className="story-card collection-card" key={collection.id}>
+            <span className="story-level">{collection.level} · {collection.provider}</span>
+            <h4>{collection.title}</h4><p>{collection.description}</p>
+            <small>{collection.count} stories · {collection.access}</small>
+            <a className="collection-open" href={collection.url} target="_blank" rel="noreferrer">Browse full collection <ArrowUpRight size={14}/></a>
           </article>)}
         </div>
         <section className="classic-shelf">
-          <div className="section-heading"><div><div className="eyebrow">CLASSIC GERMAN LITERATURE</div><h2>Three classics.</h2><p>For readers who want to try longer, more challenging literature. These are original literary texts, not A1–B1 graded readers.</p></div></div>
+          <div className="section-heading"><div><div className="eyebrow">COMPLETE PUBLIC-DOMAIN LITERATURE</div><h2>Novels and classics.</h2><p>Full literary works—not excerpts or summaries. Classics are original German literature and are not graded A1–B1. Some older works may be challenging.</p></div></div>
           <div className="classic-grid">{classicBooks.map(book=><article className="classic-card" key={book.id}>
-            <span>{book.level} · {book.author}</span><h3>{book.title}</h3><p>{book.description}</p>
-            <button onClick={()=>openWikisourcePage({title:book.pageTitle.replaceAll('_',' '),pageid:book.id})} disabled={bookLoadingId===book.id}>{bookLoadingId===book.id?'Opening…':'Read in Fluentio'} <ArrowUpRight size={14}/></button>
-            <a href={book.source} target="_blank" rel="noreferrer">Source edition</a>
+            <span>{book.type} · {book.author}</span><h3>{book.title}</h3><p>{book.description}</p>
+            <button onClick={()=>book.gutenbergId?openGutenbergBook(book):openWikisourcePage({title:book.pageTitle,pageid:book.id})} disabled={bookLoadingId===book.id}>{bookLoadingId===book.id?'Opening full text…':'Read full text'} <ArrowUpRight size={14}/></button>
+            <a href={book.source} target="_blank" rel="noreferrer">Source edition · free</a>
           </article>)}</div>
           {booksError&&<p className="reader-feedback">{booksError}</p>}
         </section>
