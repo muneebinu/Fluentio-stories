@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const root = process.cwd()
@@ -52,8 +52,8 @@ async function mirrorCuratedGutenberg() {
     matches.sort((a, b) => statSync(b).size - statSync(a).size)
     const destination = join(outputDir, book.id + '.txt')
     copyFileSync(matches[0], destination)
-    const text = (await import('node:fs')).readFileSync(destination, 'utf8')
-    output.push({ ...book, provider: 'gutenberg', word_count: text.trim().split(/\\s+/).length, subjects: ['learner reader', book.level] })
+    const text = readFileSync(destination, 'utf8')
+    output.push({ ...book, provider: 'gutenberg', word_count: text.trim().split(/\s+/).length, subjects: ['learner reader', book.level] })
   }
   return output
 }
@@ -89,7 +89,7 @@ async function mirrorWikisource() {
         if (found.has(page.pageid)) continue
         const id = 'ws-' + page.pageid
         const sourceUrl = 'https://de.wikisource.org/wiki/' + encodeURIComponent(title.replaceAll(' ', '_'))
-        const authorMatch = text.match(/(?:Autor|Verfasser)[:：]\\s*([^\\n]+)/i)
+        const authorMatch = text.match(/(?:Autor|Verfasser)[:：]\s*([^\n]+)/i)
         const authors = [{ name: authorMatch?.[1]?.trim() || 'Wikisource edition' }]
         const wordCount = text.split(/\\s+/).filter(Boolean).length
         found.set(page.pageid, {
