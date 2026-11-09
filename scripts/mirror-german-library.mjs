@@ -19,6 +19,8 @@ const germanAuthorHints = [
 
 async function collectBooks() {
   const books = []
+  const curatedResponse = await fetch('https://gutendex.com/books/?ids=' + curatedIds.join(','))
+  if (curatedResponse.ok) { const curatedData = await curatedResponse.json(); for (const book of curatedData.results || []) books.push(book) }
   let next = 'https://gutendex.com/books/?languages=de&mime_type=text%2Fplain&copyright=false&author_year_end=1955'
   let pages = 0
   while (next && pages < 40 && books.length < 160) {
@@ -35,11 +37,6 @@ async function collectBooks() {
     }
     next = data.next
     pages += 1
-  }
-  const curatedResponse = await fetch('https://gutendex.com/books/?ids=' + curatedIds.join(','))
-  if (curatedResponse.ok) {
-    const curatedData = await curatedResponse.json()
-    for (const book of curatedData.results || []) books.push(book)
   }
   const unique = [...new Map(books.map(book => [book.id, book])).values()]
   return unique.slice(0, 160)
