@@ -53,6 +53,8 @@ function App() {
   const [showAnswer, setShowAnswer] = useState(false)
   const [reviewed, setReviewed] = useState(0)
   const [phraseSelected, setPhraseSelected] = useState('')
+  const [readerFontSize, setReaderFontSize] = useState(17)
+  const [isSpeaking, setIsSpeaking] = useState(false)
 
   function persistVocab(next) { setVocab(next); localStorage.setItem('fluentio-vocab', JSON.stringify(next)) }
   function saveCurrentText() {
@@ -68,6 +70,17 @@ function App() {
     const next = [entry, ...vocab.filter(item => item.word.toLocaleLowerCase() !== activeWord.toLocaleLowerCase())]
     persistVocab(next)
   }
+  function speakPassage() {
+    if (!readerText.trim()) { setError('Add a German text before starting audio.'); return }
+    if (!('speechSynthesis' in window)) { setError('Speech is not supported in this browser.'); return }
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(readerText)
+    utterance.lang = 'de-DE'; utterance.rate = 0.9
+    utterance.onend = () => setIsSpeaking(false)
+    utterance.onerror = () => setIsSpeaking(false)
+    setIsSpeaking(true); window.speechSynthesis.speak(utterance)
+  }
+  function stopPassage() { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); setIsSpeaking(false) }
   function speakWord(value) {
     if (!('speechSynthesis' in window)) { setError('Speech is not supported in this browser.'); return }
     window.speechSynthesis.cancel()
@@ -242,11 +255,11 @@ function App() {
         <input className="reader-title-input" value={readerTitle} onChange={e=>setReaderTitle(e.target.value)} placeholder="Give your reading a title..." aria-label="Reading title"/>
         <p className="reader-instructions">Paste text from a source you are permitted to use, then tap any German word to explore it.</p>
         <textarea className="reader-paste" value={readerText} onChange={e=>setReaderText(e.target.value)} placeholder="Paste your German text here…" aria-label="German reading text"/>
-        <div className="reader-toolbar"><span>{readerText.trim() ? readerText.trim().split(/\s+/).length + ' words' : 'Your text stays in this browser session.'}</span><div className="reader-toolbar-actions"><button onClick={saveCurrentText}>Save reading</button><label className="upload-text-button">Upload .txt<input type="file" accept=".txt,text/plain" onChange={e=>loadTextFile(e.target.files?.[0])}/></label><button onClick={()=>{setReaderText('');setReaderTitle('');setActiveWord('')}}>Clear text</button></div></div>
+        <div className="reader-toolbar"><span>{readerText.trim() ? readerText.trim().split(/\s+/).length + ' words' : 'Your text stays in this browser session.'}</span><div className="reader-toolbar-actions"><button onClick={speakPassage}>Listen to text</button><button onClick={stopPassage} disabled={!isSpeaking}>Stop audio</button><button onClick={saveCurrentText}>Save reading</button><label className="upload-text-button">Upload .txt<input type="file" accept=".txt,text/plain" onChange={e=>loadTextFile(e.target.files?.[0])}/></label><button onClick={()=>{setReaderText('');setReaderTitle('');setActiveWord('')}}>Clear text</button></div></div>
         {error&&<p className="reader-feedback">{error}</p>}<div className="reader-divider"/>
-        <div className="reading-heading"><span className="eyebrow">INTERACTIVE READING</span><span className="reading-hint"><span className="hint-dot"/> Tap a word to look it up</span>{phraseSelected&&<button className="phrase-lookup" onClick={()=>lookupPhrase(phraseSelected)}>Translate selected phrase</button>}</div>
+        <div className="reading-heading"><span className="eyebrow">INTERACTIVE READING</span><span className="reading-hint"><span className="hint-dot"/> Tap a word to look it up</span><div className="reading-tools"><button onClick={()=>setReaderFontSize(Math.max(14,readerFontSize-1))} aria-label="Decrease text size">A−</button><button onClick={()=>setReaderFontSize(Math.min(28,readerFontSize+1))} aria-label="Increase text size">A+</button>{phraseSelected&&<button className="phrase-lookup" onClick={()=>lookupPhrase(phraseSelected)}>Translate selected phrase</button>}</div></div>
         {readerText.trim()
-          ? <article className="reading-paper" onMouseUp={()=>{const selection=window.getSelection()?.toString().trim()||'';setPhraseSelected(selection.split(/\s+/).length>1?selection:'')}}><h2>{readerTitle || 'German reading'}</h2><p>{renderReadableText()}</p></article>
+          ? <article className="reading-paper" onMouseUp={()=>{const selection=window.getSelection()?.toString().trim()||'';setPhraseSelected(selection.split(/\s+/).length>1?selection:'')}}><h2>{readerTitle || 'German reading'}</h2><p style={{fontSize:readerFontSize+'px'}}>{renderReadableText()}</p></article>
           : <div className="reader-empty"><BookOpen size={28}/><strong>Your reading will appear here</strong><span>Paste a German passage in the box above to get started.</span></div>}
         <div className="reader-source-note">Use text you wrote yourself, public-domain material, or content whose licence permits this use. For other publishers, read on their original website.</div>
       </section>
