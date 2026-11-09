@@ -90,45 +90,93 @@ function App() {
   useEffect(() => { loadBookCatalog(null, 'Kategorie:Roman', false, '') }, [])
 
   async function openWikisourcePage(page) {
-    const cacheKey = 'fluentio-wikisource-' + (page.pageid || page.title)
-    const source = 'https://de.wikisource.org/wiki/' + encodeURIComponent(page.title.replaceAll(' ','_'))
-    setBookLoadingId(page.pageid || page.title); setBooksError('')
+    const title = page.title
+    const cacheKey = 'fluentio-wikisource-' + (page.pageid || title)
+    const source = 'https://de.wikisource.org/wiki/' + encodeURIComponent(title.replaceAll(' ','_'))
+    setBookLoadingId(page.pageid || title)
+    setBooksError('')
     try {
       const cached = localStorage.getItem(cacheKey)
-      if (cached && cached.length >= 6000) { openReader(cached, page.title, source); return }
-      // Ask MediaWiki for formatversion 2 so parse.text is a plain HTML string.
-      // Older response formats can wrap parse.text in an object, which made the
-      // previous reader silently treat every book as an empty page.
-      const params = new URLSearchParams({ action:'query', prop:'extracts', explaintext:'1', exsectionformat:'plain', titles:page.title, format:'json', formatversion:'2', origin:'*' })
-      const response = await fetch('https://de.wikisource.org/w/api.php?' + params.toString(), { signal: AbortSignal.timeout(20000) })
-      if (!response.ok) throw new Error('Wikisource text request returned ' + response.status)
-      const data = await response.json()
-      const pages = data.query?.pages || []
-      const article = Array.isArray(pages) ? pages[0] : Object.values(pages)[0]
-      let text = (article?.extract || '').trim()
-      // The extracts extension often returns only an introductory excerpt for
-      // transcluded Wikisource works. Parse the rendered page for the full text.
+      if (cached && cached.trim().length >= 400) {
+        openReader(cached, title, source)
+        return
+      }
+
+      // Wikisource mainspace pages often transclude an entire book from Page:
+      // namespace scans. The parse API expands those transclusions into the
+      // complete readable text. Do not send both "page" and "pageid": MediaWiki
+      // treats them as mutually exclusive and rejects the request.
+      const extractParams = new URLSearchParams({
+        action: 'query',
+        prop: 'extracts',
+        explaintext: '1',
+        exsectionformat: 'plain',
+        titles: title,
+        format: 'json',
+        formatversion: '2',
+        origin: '*'
+      })
+      let text = ''
+      const extractResponse = await fetch('https://de.wikisource.org/w/api.php?' + extractParams.toString(), {
+        signal: AbortSignal.timeout(20000)
+      })
+      if (extractResponse.ok) {
+        const extractData = await extractResponse.json()
+        const pages = extractData.query?.pages || []
+        const article = Array.isArray(pages) ? pages[0] : Object.values(pages)[0]
+        text = (article?.extract || '').trim()
+      }
+
+      // Always try the rendered page when the extract is only a short lead.
+      // This is the important path for books assembled from scanned Page pages.
       if (text.length < 12000) {
-        const parseParams = new URLSearchParams({ action:'parse', pageid:String(page.pageid || ''), page:page.title, prop:'text', format:'json', formatversion:'2', redirects:'1', origin:'*' })
-        const parsed = await fetch('https://de.wikisource.org/w/api.php?' + parseParams.toString(), { signal: AbortSignal.timeout(30000) })
-        if (!parsed.ok) throw new Error('Wikisource page parser returned ' + parsed.status)
-        const parsedData = await parsed.json()
-        const parseText = parsedData.parse?.text
-        const html = typeof parseText === 'string' ? parseText : (parseText?.['*'] || '')
+        const parseParams = new URLSearchParams({
+          action: 'parse',
+          page: title,
+          prop: 'text',
+          format: 'json',
+          formatversion: '2',
+          redirects: '1',
+          disablelimitreport: '1',
+          origin: '*'
+        })
+        const parseResponse = await fetch('https://de.wikisource.org/w/api.php?' + parseParams.toString(), {
+          signal: AbortSignal.timeout(45000)
+        })
+        if (!parseResponse.ok) throw new Error('Wikisource parser returned HTTP ' + parseResponse.status)
+        const parseData = await parseResponse.json()
+        if (parseData.error) throw new Error(parseData.error.info || 'Wikisource could not parse this page')
+        const parseHtml = parseData.parse?.text
+        const html = typeof parseHtml === 'string' ? parseHtml : (parseHtml?.['*'] || '')
         if (html) {
-          const doc = new DOMParser().parseFromString(html,'text/html')
-          doc.querySelectorAll('script,style,nav,header,footer,.mw-editsection,.references,.reflist,.navbox,.catlinks,.toc,.ws-noexport').forEach(node=>node.remove())
-          const expanded = (doc.querySelector('.mw-parser-output') || doc.body)?.innerText || ''
-          if (expanded.trim().length > text.length) text = expanded.trim()
+          const doc = new DOMParser().parseFromString(html, 'text/html')
+          doc.querySelectorAll('script,style,nav,header,footer,button,.mw-editsection,.references,.reflist,.navbox,.catlinks,.toc,.ws-noexport,.printfooter,.authority-control,.metadata').forEach(node => node.remove())
+          const content = doc.querySelector('.mw-parser-output') || doc.querySelector('#mw-content-text') || doc.body
+          const rendered = (content?.innerText || content?.textContent || '').replace(/\\u00a0/g, ' ').replace(/\\n{3,}/g, '\\n\\n').trim()
+          // Prefer rendered transclusion text if it is longer than the extract.
+          if (rendered.length > text.length) text = rendered
         }
       }
-      if (text.length < 400) throw new Error('The source page has no readable transcription')
-      if (text.length > 1500000) text = text.slice(0,1500000) + '\n\n[The browser reader has shortened this very large text. Open the source edition for the complete work.]'
+
+      // Some Wikisource pages are only scans or bibliographic records. Do not
+      // pretend those are complete books; surface the actual reason to students.
+      if (text.trim().length < 400) {
+        throw new Error('This Wikisource entry has no machine-readable transcription. It may contain scans only.')
+      }
+
+      if (text.length > 1500000) {
+        text = text.slice(0, 1500000) + '\\n\\n[Reader limit reached. The source edition contains additional text.]'
+      }
+      text = text.replace(/\\n[ \\t]+/g, '\\n').replace(/\\n{3,}/g, '\\n\\n').trim()
       try { localStorage.setItem(cacheKey, text) } catch {}
-      openReader(text, page.title, source)
-    } catch {
-      setBooksError('This source page does not expose a substantial full-text transcription. Fluentio hides short fragments instead of presenting them as complete books. Try another title or open the original source.')
-    } finally { setBookLoadingId(null) }
+      openReader(text, title, source)
+    } catch (error) {
+      console.error('Fluentio book loading failed:', title, error)
+      const reason = error?.message || 'Unknown loading error'
+      setBooksError('Could not open "' + title + '" inside Fluentio. ' + reason + ' Choose another transcription-ready edition; scan-only entries cannot be read as text yet.')
+    } finally {
+      setBookLoadingId(null)
+    }
   }
 
   function persistVocab(next) { setVocab(next); localStorage.setItem('fluentio-vocab', JSON.stringify(next)) }
